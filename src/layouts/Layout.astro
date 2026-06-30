@@ -42,34 +42,14 @@ const {
             <slot />
           </div>
         </main>
-        <footer class="mt-12 bg-ink-900 text-ink-100">
-          <div class="container-app px-4 sm:px-6 lg:px-8 py-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <p class="font-display text-2xl text-brand-200 mb-2">Sharing Fair</p>
-              <p class="text-sm text-ink-300/80 leading-relaxed max-w-xs">
-                Une boutique pensée comme un lieu de partage. Chaque fiche client compte, chaque rencontre aussi.
-              </p>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-300/80 mb-3">Navigation</p>
-              <ul class="space-y-1.5 text-sm">
-                <li><a href="/" class="text-ink-200 hover:text-brand-200 transition-colors">Tableau de bord</a></li>
-                <li><a href="/clients" class="text-ink-200 hover:text-brand-200 transition-colors">Clients</a></li>
-                <li><a href="/clients/nouveau" class="text-ink-200 hover:text-brand-200 transition-colors">Nouveau client</a></li>
-              </ul>
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-300/80 mb-3">À propos</p>
-              <p class="text-sm text-ink-300/80 leading-relaxed">
-                Fabriqué avec le cœur. Outil interne pour la gestion quotidienne de la boutique.
-              </p>
-            </div>
-          </div>
-          <div class="border-t border-ink-700/60">
-            <div class="container-app px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-400">
-              <span>© {new Date().getFullYear()} Sharing Fair · Tous droits réservés</span>
-              <span class="font-display italic text-ink-300">Conçu avec soin</span>
-            </div>
+        <footer class="mt-12 bg-ink-900 text-ink-300">
+          <div class="container-app px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <span>© {new Date().getFullYear()} Sharing Fair</span>
+            <nav class="flex items-center gap-4">
+              <a href="/" class="hover:text-brand-200 transition-colors">Tableau de bord</a>
+              <a href="/clients" class="hover:text-brand-200 transition-colors">Clients</a>
+              <a href="/logout" class="hover:text-brand-200 transition-colors">Déconnexion</a>
+            </nav>
           </div>
         </footer>
       </div>

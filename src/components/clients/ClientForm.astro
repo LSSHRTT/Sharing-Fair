@@ -1,7 +1,6 @@
 ---
 import Field from '../ui/Field.astro';
 import Input from '../ui/Input.astro';
-import Textarea from '../ui/Textarea.astro';
 import Button from '../ui/Button.astro';
 import Icon from '../ui/Icon.astro';
 import type { Client } from '../../../functions/api/lib/db';
@@ -24,20 +23,10 @@ const {
 
 const errFor = (field: string): string | undefined =>
   fieldErrors?.[field]?.[0];
-
-const tagsValue = (client.tags ?? []).join(', ');
 ---
 
-<form method="POST" action={action} class="space-y-8" novalidate>
-  <!-- Identité -->
+<form method="POST" action={action} class="space-y-6" novalidate>
   <section class="surface p-5 sm:p-6 space-y-4">
-    <header class="flex items-center gap-2">
-      <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-        <Icon name="users" size={16} />
-      </span>
-      <h2 class="text-sm font-semibold text-ink-900 tracking-tight">Identité</h2>
-    </header>
-
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Prénom" id="first_name" required error={errFor('first_name')}>
         <Input
@@ -61,16 +50,6 @@ const tagsValue = (client.tags ?? []).join(', ');
           hasError={!!errFor('last_name')}
         />
       </Field>
-      <Field label="Email" id="email" hint="Optionnel — utilisé pour les newsletters." error={errFor('email')}>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          autocomplete="email"
-          value={client.email ?? ''}
-          hasError={!!errFor('email')}
-        />
-      </Field>
       <Field label="Téléphone" id="phone" error={errFor('phone')}>
         <Input
           id="phone"
@@ -82,125 +61,17 @@ const tagsValue = (client.tags ?? []).join(', ');
           hasError={!!errFor('phone')}
         />
       </Field>
-      <Field label="Date de naissance" id="birth_date" hint="Format AAAA-MM-JJ" error={errFor('birth_date')}>
+      <Field label="Email" id="email" error={errFor('email')}>
         <Input
-          id="birth_date"
-          name="birth_date"
-          type="date"
-          value={client.birth_date ?? ''}
-          hasError={!!errFor('birth_date')}
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          value={client.email ?? ''}
+          hasError={!!errFor('email')}
         />
       </Field>
     </div>
-  </section>
-
-  <!-- Adresse -->
-  <section class="surface p-5 sm:p-6 space-y-4">
-    <header class="flex items-center gap-2">
-      <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg bg-info-50 text-info-700">
-        <Icon name="map-pin" size={16} />
-      </span>
-      <h2 class="text-sm font-semibold text-ink-900 tracking-tight">Adresse</h2>
-    </header>
-
-    <Field label="Rue" id="address_line1" error={errFor('address_line1')}>
-      <Input
-        id="address_line1"
-        name="address_line1"
-        autocomplete="address-line1"
-        maxlength={200}
-        value={client.address_line1 ?? ''}
-        hasError={!!errFor('address_line1')}
-      />
-    </Field>
-    <Field label="Complément" id="address_line2" error={errFor('address_line2')}>
-      <Input
-        id="address_line2"
-        name="address_line2"
-        autocomplete="address-line2"
-        maxlength={200}
-        value={client.address_line2 ?? ''}
-        hasError={!!errFor('address_line2')}
-      />
-    </Field>
-
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <Field label="Code postal" id="postal_code" error={errFor('postal_code')}>
-        <Input
-          id="postal_code"
-          name="postal_code"
-          autocomplete="postal-code"
-          maxlength={20}
-          value={client.postal_code ?? ''}
-          hasError={!!errFor('postal_code')}
-        />
-      </Field>
-      <Field label="Ville" id="city" class="sm:col-span-1" error={errFor('city')}>
-        <Input
-          id="city"
-          name="city"
-          autocomplete="address-level2"
-          maxlength={100}
-          value={client.city ?? ''}
-          hasError={!!errFor('city')}
-        />
-      </Field>
-      <Field label="Pays" id="country" error={errFor('country')}>
-        <Input
-          id="country"
-          name="country"
-          autocomplete="country-name"
-          maxlength={100}
-          value={client.country ?? 'France'}
-          hasError={!!errFor('country')}
-        />
-      </Field>
-    </div>
-  </section>
-
-  <!-- Profil -->
-  <section class="surface p-5 sm:p-6 space-y-4">
-    <header class="flex items-center gap-2">
-      <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg bg-success-50 text-success-700">
-        <Icon name="tag" size={16} />
-      </span>
-      <h2 class="text-sm font-semibold text-ink-900 tracking-tight">Profil &amp; notes</h2>
-    </header>
-
-    <Field
-      label="Tags"
-      id="tags"
-      hint="Séparés par des virgules — ex. VIP, Newsletter, Bio."
-      error={errFor('tags')}
-    >
-      <Input
-        id="tags"
-        name="tags"
-        placeholder="VIP, Newsletter"
-        value={tagsValue}
-        hasError={!!errFor('tags')}
-      />
-    </Field>
-
-    <Field label="Préférences d'achat" id="preferences" error={errFor('preferences')}>
-      <Textarea
-        id="preferences"
-        name="preferences"
-        rows={2}
-        value={client.preferences ?? ''}
-        hasError={!!errFor('preferences')}
-      />
-    </Field>
-
-    <Field label="Notes libres" id="notes" error={errFor('notes')}>
-      <Textarea
-        id="notes"
-        name="notes"
-        rows={4}
-        value={client.notes ?? ''}
-        hasError={!!errFor('notes')}
-      />
-    </Field>
   </section>
 
   <div class="flex items-center gap-2 flex-wrap">
