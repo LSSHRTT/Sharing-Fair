@@ -5,5 +5,5 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "sharing_fair_db"
-database_id = "REPLACE_AFTER_DB_CREATION"
+database_id = "69da9de2-7052-4dbd-9317-24e1ac20b720"
 migrations_dir = "migrations"
