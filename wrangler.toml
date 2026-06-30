@@ -1,0 +1,9 @@
+name = "sharing-fair"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sharing_fair_db"
+database_id = "REPLACE_AFTER_DB_CREATION"
+migrations_dir = "migrations"
