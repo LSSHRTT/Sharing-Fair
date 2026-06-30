@@ -22,19 +22,25 @@ if (Astro.request.method === 'POST') {
   const submittedNext = String(form.get('next') ?? '/');
   const target = submittedNext.startsWith('/') && !submittedNext.startsWith('//') ? submittedNext : '/';
 
-  const ok = await passwordMatches(password, env.AUTH_PASSWORD);
-  if (ok) {
-    const token = await createSessionToken(env.AUTH_SECRET);
-    Astro.cookies.set(sessionCookieName(), token, {
-      path: '/',
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: sessionCookieMaxAge(),
-    });
-    return Astro.redirect(target, 302);
+  if (!env?.AUTH_PASSWORD) {
+    error = 'DIAG: AUTH_PASSWORD absent ou vide côté serveur.';
+  } else if (!env?.AUTH_SECRET) {
+    error = 'DIAG: AUTH_SECRET absent ou vide côté serveur.';
+  } else {
+    const ok = await passwordMatches(password, env.AUTH_PASSWORD);
+    if (ok) {
+      const token = await createSessionToken(env.AUTH_SECRET);
+      Astro.cookies.set(sessionCookieName(), token, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: sessionCookieMaxAge(),
+      });
+      return Astro.redirect(target, 302);
+    }
+    error = `DIAG: Mot de passe incorrect. Longueur saisie: ${password.length}, attendue: ${env.AUTH_PASSWORD.length}.`;
   }
-  error = 'Mot de passe incorrect.';
 }
 ---
 

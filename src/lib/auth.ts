@@ -36,10 +36,12 @@ function constantTimeEqual(a: string, b: string): boolean {
 
 export async function passwordMatches(input: string, expected: string): Promise<boolean> {
   if (!expected) return false;
-  const enc = new TextEncoder();
-  const inputHash = bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(input))));
-  const expectedHash = bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(expected))));
-  return constantTimeEqual(inputHash, expectedHash);
+  if (input.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < input.length; i++) {
+    mismatch |= input.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
 
 export async function createSessionToken(secret: string): Promise<string> {
