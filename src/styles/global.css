@@ -2,65 +2,78 @@
 
 /* ============================================================
    Design tokens — Sharing Fair
+   Inspiration: boutique solidaire / épicerie fine artisanale
    ============================================================ */
 @theme {
   /* Typography */
   --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", "Playfair Display", Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
-  /* Brand — Coral */
-  --color-brand-50:  #FFF5F2;
-  --color-brand-100: #FFE4DC;
-  --color-brand-200: #FFCABD;
-  --color-brand-300: #FFA88E;
-  --color-brand-400: #FF8566;
-  --color-brand-500: #FF6B4A;
-  --color-brand-600: #E54E2D;
-  --color-brand-700: #B83C22;
-  --color-brand-800: #8A2D1A;
-  --color-brand-900: #5C1E12;
-  --color-brand-950: #361007;
+  /* Brand — Terracotta (warm artisanal orange) */
+  --color-brand-50:  #FBF4EF;
+  --color-brand-100: #F4E2D3;
+  --color-brand-200: #EBC6A8;
+  --color-brand-300: #DFA47A;
+  --color-brand-400: #D17F50;
+  --color-brand-500: #C65D3A;
+  --color-brand-600: #B14A2B;
+  --color-brand-700: #8E3A22;
+  --color-brand-800: #6B2C1B;
+  --color-brand-900: #4A1F14;
+  --color-brand-950: #2A100A;
 
-  /* Neutral — warm slate */
-  --color-ink-50:  #F8FAFC;
-  --color-ink-100: #F1F5F9;
-  --color-ink-200: #E2E8F0;
-  --color-ink-300: #CBD5E1;
-  --color-ink-400: #94A3B8;
-  --color-ink-500: #64748B;
-  --color-ink-600: #475569;
-  --color-ink-700: #334155;
-  --color-ink-800: #1E293B;
-  --color-ink-900: #0F172A;
-  --color-ink-950: #020617;
+  /* Neutral — Cream & warm stone */
+  --color-ink-50:  #FAF7F2;
+  --color-ink-100: #F2EBE0;
+  --color-ink-200: #E6DCCB;
+  --color-ink-300: #D1C2A8;
+  --color-ink-400: #A89880;
+  --color-ink-500: #7A6B58;
+  --color-ink-600: #5C5040;
+  --color-ink-700: #423931;
+  --color-ink-800: #2C2826;
+  --color-ink-900: #1F1B17;
+  --color-ink-950: #100E0C;
 
-  /* Semantic */
-  --color-success-50:  #F0FDF4;
-  --color-success-100: #DCFCE7;
-  --color-success-500: #22C55E;
-  --color-success-600: #16A34A;
-  --color-success-700: #15803D;
+  /* Accent — Olive / forest (artisan secondary) */
+  --color-accent-50:  #F3F5EE;
+  --color-accent-100: #E3E7D5;
+  --color-accent-200: #C8D0AE;
+  --color-accent-300: #A6B284;
+  --color-accent-400: #859361;
+  --color-accent-500: #6B7A4B;
+  --color-accent-600: #55613B;
+  --color-accent-700: #424B2E;
+  --color-accent-800: #303724;
+  --color-accent-900: #1F2418;
 
-  --color-warning-50:  #FFFBEB;
-  --color-warning-100: #FEF3C7;
-  --color-warning-500: #F59E0B;
-  --color-warning-600: #D97706;
-  --color-warning-700: #B45309;
+  /* Semantic — warm-tinted */
+  --color-success-50:  #F2F7EF;
+  --color-success-100: #E0EBD7;
+  --color-success-500: #6B8E4B;
+  --color-success-600: #557339;
+  --color-success-700: #42592C;
 
-  --color-danger-50:  #FEF2F2;
-  --color-danger-100: #FEE2E2;
-  --color-danger-500: #EF4444;
-  --color-danger-600: #DC2626;
-  --color-danger-700: #B91C1C;
+  --color-warning-50:  #FBF4E4;
+  --color-warning-100: #F5E5BF;
+  --color-warning-500: #D9A441;
+  --color-warning-600: #B8862B;
+  --color-warning-700: #8E661F;
 
-  --color-info-50:  #EFF6FF;
-  --color-info-100: #DBEAFE;
-  --color-info-500: #3B82F6;
-  --color-info-600: #2563EB;
-  --color-info-700: #1D4ED8;
+  --color-danger-50:  #FBEFEA;
+  --color-danger-100: #F5D7C9;
+  --color-danger-500: #B83B1F;
+  --color-danger-600: #962D17;
+  --color-danger-700: #722010;
 
-  /* Radii */
+  --color-info-50:  #EEF2F4;
+  --color-info-100: #D7DEE5;
+  --color-info-500: #4F6B82;
+  --color-info-600: #3D5567;
+  --color-info-700: #2D404F;
+
+  /* Radii — softly rounded, artisanal */
   --radius-xs: 0.25rem;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
@@ -69,13 +82,13 @@
   --radius-2xl: 1.25rem;
   --radius-full: 9999px;
 
-  /* Shadows — soft, layered */
-  --shadow-xs:   0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-sm:   0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
-  --shadow-md:   0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
-  --shadow-lg:   0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05);
-  --shadow-xl:   0 20px 25px -5px rgb(15 23 42 / 0.1), 0 8px 10px -6px rgb(15 23 42 / 0.05);
-  --shadow-glow: 0 0 0 4px rgb(255 107 74 / 0.12);
+  /* Shadows — warm-tinted, gentle */
+  --shadow-xs:   0 1px 2px 0 rgb(44 40 38 / 0.04);
+  --shadow-sm:   0 1px 3px 0 rgb(44 40 38 / 0.06), 0 1px 2px -1px rgb(44 40 38 / 0.04);
+  --shadow-md:   0 4px 8px -2px rgb(44 40 38 / 0.07), 0 2px 4px -2px rgb(44 40 38 / 0.05);
+  --shadow-lg:   0 10px 20px -4px rgb(44 40 38 / 0.08), 0 4px 8px -4px rgb(44 40 38 / 0.05);
+  --shadow-xl:   0 20px 30px -6px rgb(44 40 38 / 0.1), 0 8px 12px -6px rgb(44 40 38 / 0.05);
+  --shadow-glow: 0 0 0 4px rgb(198 93 58 / 0.14);
 
   /* Easing & duration */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -104,10 +117,18 @@
   body {
     @apply bg-ink-50 text-ink-900;
     background-image:
-      radial-gradient(at 0% 0%, rgb(255 107 74 / 0.04) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgb(59 130 246 / 0.03) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, rgb(198 93 58 / 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgb(107 122 75 / 0.04) 0px, transparent 50%);
     background-attachment: fixed;
   }
+
+  /* Display headings — serif éditorial */
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  h1 { font-weight: 600; }
 
   /* Selection */
   ::selection {
@@ -141,7 +162,7 @@
   input:-webkit-autofill,
   textarea:-webkit-autofill,
   select:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0px 1000px white inset;
+    -webkit-box-shadow: 0 0 0px 1000px var(--color-ink-50) inset;
     -webkit-text-fill-color: var(--color-ink-900);
     transition: background-color 5000s ease-in-out 0s;
   }
@@ -151,7 +172,7 @@
    Utility components
    ============================================================ */
 @layer components {
-  /* Glass surface */
+  /* Surface — warm card */
   .surface {
     @apply bg-white border border-ink-200/80 rounded-xl shadow-sm;
   }
@@ -162,12 +183,19 @@
     @apply border-ink-300 shadow-md -translate-y-px;
   }
 
-  /* Card with subtle gradient top */
+  /* Feature card with subtle warm gradient top */
   .card-feature {
     @apply bg-white border border-ink-200/80 rounded-xl shadow-sm relative overflow-hidden;
     background-image:
-      linear-gradient(180deg, rgb(255 107 74 / 0.02) 0%, transparent 40%),
+      linear-gradient(180deg, rgb(198 93 58 / 0.03) 0%, transparent 40%),
       linear-gradient(0deg, white, white);
+  }
+
+  /* Container */
+  .container-app {
+    max-width: var(--container-page);
+    margin-inline: auto;
+    width: 100%;
   }
 
   /* Animated entrance */
