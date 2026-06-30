@@ -1,0 +1,184 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import Button from '../../../components/ui/Button.astro';
+import Card from '../../../components/ui/Card.astro';
+import Avatar from '../../../components/ui/Avatar.astro';
+import TagPill from '../../../components/ui/TagPill.astro';
+import Icon from '../../../components/ui/Icon.astro';
+import Badge from '../../../components/ui/Badge.astro';
+import { getClient } from '../../../../functions/api/lib/db';
+import { fullName, formatDateTime, formatDate } from '../../../lib/format';
+
+const { id } = Astro.params;
+const clientId = Number(id);
+
+if (!Number.isInteger(clientId) || clientId <= 0) {
+  return new Response('ID invalide', { status: 400 });
+}
+
+const DB = Astro.locals.runtime.env.DB;
+const client = await getClient(DB, clientId);
+
+if (!client) {
+  return new Response(null, { status: 404 });
+}
+
+const v = (val: string | null | undefined): string => val ?? '—';
+---
+
+<Layout title={`${fullName(client)} — Sharing Fair`}>
+  <div class="max-w-5xl mx-auto space-y-6">
+    <PageHeader
+      title={fullName(client)}
+      crumbs={[
+        { label: 'Clients', href: '/clients' },
+        { label: fullName(client) },
+      ]}
+    >
+      <Button slot="actions" href={`/clients/${client.id}/modifier`} variant="outline">
+        <Icon name="edit" size={16} />
+        Modifier
+      </Button>
+      <form slot="actions" method="POST" action={`/clients/${client.id}/supprimer`}>
+        <Button
+          type="submit"
+          variant="danger"
+          data-confirm={`Supprimer définitivement ${fullName(client)} ?`}
+        >
+          <Icon name="trash" size={16} />
+          Supprimer
+        </Button>
+      </form>
+    </PageHeader>
+
+    <!-- Header card -->
+    <Card class="p-6">
+      <div class="flex items-start gap-4">
+        <Avatar firstName={client.first_name} lastName={client.last_name} size="xl" />
+        <div class="flex-1 min-w-0">
+          <h1 class="text-2xl font-bold text-ink-900 tracking-tight">{fullName(client)}</h1>
+          {client.tags.length > 0 && (
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              {client.tags.map((t) => <TagPill tag={t} />)}
+            </div>
+          )}
+          <div class="flex flex-wrap gap-3 mt-3 text-sm text-ink-600">
+            {client.email && (
+              <a href={`mailto:${client.email}`} class="inline-flex items-center gap-1.5 hover:text-brand-700 transition-colors">
+                <Icon name="mail" size={14} />
+                <span class="truncate">{client.email}</span>
+              </a>
+            )}
+            {client.phone && (
+              <a href={`tel:${client.phone}`} class="inline-flex items-center gap-1.5 hover:text-brand-700 transition-colors">
+                <Icon name="phone" size={14} />
+                <span>{client.phone}</span>
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- Info grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Contact -->
+      <Card class="p-5">
+        <header class="flex items-center gap-2 mb-4">
+          <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+            <Icon name="mail" size={16} />
+          </span>
+          <h2 class="text-sm font-semibold text-ink-900">Contact</h2>
+        </header>
+        <dl class="space-y-2.5 text-sm">
+          <div class="flex items-start justify-between gap-3">
+            <dt class="text-ink-500 font-medium">Email</dt>
+            <dd class="text-ink-900 text-right truncate">{v(client.email)}</dd>
+          </div>
+          <div class="flex items-start justify-between gap-3">
+            <dt class="text-ink-500 font-medium">Téléphone</dt>
+            <dd class="text-ink-900 text-right">{v(client.phone)}</dd>
+          </div>
+          <div class="flex items-start justify-between gap-3">
+            <dt class="text-ink-500 font-medium">Naissance</dt>
+            <dd class="text-ink-900 text-right">{client.birth_date ? formatDate(client.birth_date) : '—'}</dd>
+          </div>
+        </dl>
+      </Card>
+
+      <!-- Adresse -->
+      <Card class="p-5">
+        <header class="flex items-center gap-2 mb-4">
+          <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg bg-info-50 text-info-700">
+            <Icon name="map-pin" size={16} />
+          </span>
+          <h2 class="text-sm font-semibold text-ink-900">Adresse</h2>
+        </header>
+        <address class="not-italic text-sm text-ink-900 space-y-0.5">
+          {client.address_line1 && <div>{client.address_line1}</div>}
+          {client.address_line2 && <div class="text-ink-600">{client.address_line2}</div>}
+          {(client.postal_code || client.city) && (
+            <div class="pt-1">
+              {client.postal_code && <span class="font-medium">{client.postal_code}</span>}
+              {client.city && <span> {client.city}</span>}
+            </div>
+          )}
+          {client.country && <div class="text-ink-600">{client.country}</div>}
+          {!client.address_line1 && !client.city && <div class="text-ink-500 italic">Aucune adresse renseignée</div>}
+        </address>
+      </Card>
+    </div>
+
+    <!-- Notes & Preferences -->
+    {(client.preferences || client.notes) && (
+      <Card class="p-5">
+        <header class="flex items-center gap-2 mb-4">
+          <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg bg-success-50 text-success-700">
+            <Icon name="note" size={16} />
+          </span>
+          <h2 class="text-sm font-semibold text-ink-900">Profil &amp; Notes</h2>
+        </header>
+        <div class="space-y-4">
+          {client.preferences && (
+            <div>
+              <h3 class="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-1.5">Préférences d'achat</h3>
+              <p class="text-sm text-ink-900 whitespace-pre-wrap leading-relaxed">{client.preferences}</p>
+            </div>
+          )}
+          {client.notes && (
+            <div>
+              <h3 class="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-1.5">Notes libres</h3>
+              <p class="text-sm text-ink-900 whitespace-pre-wrap leading-relaxed">{client.notes}</p>
+            </div>
+          )}
+        </div>
+      </Card>
+    )}
+
+    <!-- Metadata footer -->
+    <div class="flex items-center justify-between text-xs text-ink-400 px-1">
+      <div class="flex items-center gap-1">
+        <Icon name="calendar" size={12} />
+        <span>Créé le {formatDateTime(client.created_at)}</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <Icon name="calendar" size={12} />
+        <span>Modifié le {formatDateTime(client.updated_at)}</span>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script is:inline>
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (form instanceof HTMLFormElement && form.querySelector('[data-confirm]')) {
+      const btn = form.querySelector('[data-confirm]');
+      const msg = btn?.getAttribute('data-confirm');
+      if (msg && !confirm(msg)) {
+        e.preventDefault();
+      }
+    }
+  });
+</script>

@@ -1,0 +1,93 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import Toast from '../../../components/ui/Toast.astro';
+import ClientForm from '../../../components/clients/ClientForm.astro';
+import { clientInputSchema } from '../../../../functions/api/lib/schemas';
+import { getClient, updateClient } from '../../../../functions/api/lib/db';
+import { fullName } from '../../../lib/format';
+
+const { id } = Astro.params;
+const clientId = Number(id);
+
+if (!Number.isInteger(clientId) || clientId <= 0) {
+  return new Response('ID invalide', { status: 400 });
+}
+
+const DB = Astro.locals.runtime.env.DB;
+let client = await getClient(DB, clientId);
+
+if (!client) {
+  return new Response(null, { status: 404 });
+}
+
+let serverError: string | null = null;
+let fieldErrors: Record<string, string[]> | null = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+
+    const tagsRaw = String(form.get('tags') ?? '').trim();
+    const tags = tagsRaw
+      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      : [];
+
+    const payload = {
+      first_name: String(form.get('first_name') ?? '').trim(),
+      last_name: String(form.get('last_name') ?? '').trim(),
+      email: String(form.get('email') ?? '').trim() || undefined,
+      phone: String(form.get('phone') ?? '').trim() || undefined,
+      address_line1: String(form.get('address_line1') ?? '').trim() || undefined,
+      address_line2: String(form.get('address_line2') ?? '').trim() || undefined,
+      postal_code: String(form.get('postal_code') ?? '').trim() || undefined,
+      city: String(form.get('city') ?? '').trim() || undefined,
+      country: String(form.get('country') ?? '').trim() || undefined,
+      birth_date: String(form.get('birth_date') ?? '').trim() || undefined,
+      preferences: String(form.get('preferences') ?? '').trim() || undefined,
+      notes: String(form.get('notes') ?? '').trim() || undefined,
+      tags,
+    };
+
+    const parsed = clientInputSchema.safeParse(payload);
+    if (!parsed.success) {
+      fieldErrors = parsed.error.flatten().fieldErrors;
+      serverError = 'Certains champs contiennent des erreurs. Veuillez les corriger.';
+      // Echo back submitted values so the form re-renders with user input
+      client = { ...client, ...payload, tags } as typeof client;
+    } else {
+      const updated = await updateClient(DB, clientId, parsed.data);
+      if (!updated) {
+        return new Response(null, { status: 404 });
+      }
+      return Astro.redirect(`/clients/${clientId}`);
+    }
+  } catch (e) {
+    serverError = e instanceof Error ? e.message : 'Erreur inconnue lors de la mise à jour.';
+  }
+}
+---
+
+<Layout title={`Modifier ${fullName(client)} — Sharing Fair`}>
+  <div class="max-w-4xl mx-auto space-y-6">
+    <PageHeader
+      title={`Modifier ${fullName(client)}`}
+      description="Mettez à jour les informations de cette fiche client."
+      crumbs={[
+        { label: 'Clients', href: '/clients' },
+        { label: fullName(client), href: `/clients/${clientId}` },
+        { label: 'Modifier' },
+      ]}
+    />
+
+    {serverError && <Toast type="danger" message={serverError} />}
+
+    <ClientForm
+      client={client}
+      action={`/clients/${clientId}/modifier`}
+      submitLabel="Enregistrer les modifications"
+      cancelHref={`/clients/${clientId}`}
+      fieldErrors={fieldErrors}
+    />
+  </div>
+</Layout>

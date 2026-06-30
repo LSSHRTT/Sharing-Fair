@@ -1,0 +1,87 @@
+---
+import Icon from './Icon.astro';
+import { cn } from '../../lib/cn';
+
+interface Props {
+  page: number;
+  totalPages: number;
+  baseUrl: string;
+  searchParams?: Record<string, string>;
+  class?: string;
+}
+
+const { page, totalPages, baseUrl, searchParams = {}, class: className = '' } = Astro.props;
+
+function buildUrl(p: number): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams)) {
+    if (v) params.set(k, v);
+  }
+  params.set('page', String(p));
+  return `${baseUrl}?${params.toString()}`;
+}
+
+function pageWindow(): number[] {
+  const range: number[] = [];
+  const left = Math.max(1, page - 2);
+  const right = Math.min(totalPages, page + 2);
+  for (let i = left; i <= right; i++) range.push(i);
+  return range;
+}
+
+const win = pageWindow();
+const showFirst = win[0] > 1;
+const showLast = win[win.length - 1] < totalPages;
+const showLeftEllipsis = win[0] > 2;
+const showRightEllipsis = win[win.length - 1] < totalPages - 1;
+
+const linkBase =
+  'inline-flex items-center justify-center min-w-9 h-9 px-3 rounded-lg text-sm font-medium transition-colors';
+const linkInactive = 'text-ink-700 hover:bg-ink-100';
+const linkActive = 'bg-brand-500 text-white shadow-sm';
+const linkDisabled = 'text-ink-400 cursor-not-allowed pointer-events-none';
+---
+
+{totalPages > 1 && (
+  <nav class={cn('flex items-center justify-center gap-1', className)} aria-label="Pagination">
+    <a
+      href={page > 1 ? buildUrl(page - 1) : '#'}
+      class={cn(linkBase, page > 1 ? linkInactive : linkDisabled)}
+      aria-label="Page précédente"
+    >
+      <Icon name="arrow-left" size={16} />
+    </a>
+
+    {showFirst && (
+      <>
+        <a href={buildUrl(1)} class={cn(linkBase, linkInactive)}>1</a>
+        {showLeftEllipsis && <span class="px-1 text-ink-400">…</span>}
+      </>
+    )}
+
+    {win.map((p) => (
+      <a
+        href={buildUrl(p)}
+        class={cn(linkBase, p === page ? linkActive : linkInactive)}
+        aria-current={p === page ? 'page' : undefined}
+      >
+        {p}
+      </a>
+    ))}
+
+    {showLast && (
+      <>
+        {showRightEllipsis && <span class="px-1 text-ink-400">…</span>}
+        <a href={buildUrl(totalPages)} class={cn(linkBase, linkInactive)}>{totalPages}</a>
+      </>
+    )}
+
+    <a
+      href={page < totalPages ? buildUrl(page + 1) : '#'}
+      class={cn(linkBase, page < totalPages ? linkInactive : linkDisabled)}
+      aria-label="Page suivante"
+    >
+      <Icon name="arrow-right" size={16} />
+    </a>
+  </nav>
+)}

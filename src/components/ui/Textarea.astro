@@ -1,0 +1,24 @@
+---
+import { cn } from '../../lib/cn';
+
+interface Props {
+  id?: string;
+  name?: string;
+  value?: string | null;
+  placeholder?: string;
+  rows?: number;
+  required?: boolean;
+  maxlength?: number;
+  hasError?: boolean;
+  class?: string;
+}
+
+const { value, rows = 3, hasError = false, class: className = '', ...rest } = Astro.props;
+
+const base =
+  'block w-full rounded-lg border bg-white text-sm text-ink-900 placeholder-ink-400 shadow-xs transition-all duration-150 focus:outline-none focus:ring-4 px-3 py-2.5 resize-y min-h-[5rem]';
+const normal = 'border-ink-200 hover:border-ink-300 focus:border-brand-500 focus:ring-brand-500/15';
+const error = 'border-danger-300 focus:border-danger-500 focus:ring-danger-500/15';
+---
+
+<textarea rows={rows} class={cn(base, hasError ? error : normal, className)} {...rest}>{value ?? ''}</textarea>

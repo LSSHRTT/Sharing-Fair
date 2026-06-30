@@ -1,0 +1,33 @@
+---
+import Icon from './Icon.astro';
+import { cn } from '../../lib/cn';
+
+interface Props {
+  type?: 'success' | 'info' | 'warning' | 'danger';
+  message: string;
+  class?: string;
+}
+
+const { type = 'info', message, class: className = '' } = Astro.props;
+
+const palette = {
+  success: { bg: 'bg-success-50 text-success-800 border-success-200', icon: 'check' as const },
+  info: { bg: 'bg-info-50 text-info-800 border-info-200', icon: 'info' as const },
+  warning: { bg: 'bg-warning-50 text-warning-800 border-warning-200', icon: 'info' as const },
+  danger: { bg: 'bg-danger-50 text-danger-800 border-danger-200', icon: 'x' as const },
+};
+
+const p = palette[type];
+---
+
+<div
+  role="status"
+  class={cn(
+    'flex items-start gap-3 px-4 py-3 rounded-lg border text-sm font-medium animate-slide-up shadow-sm',
+    p.bg,
+    className
+  )}
+>
+  <Icon name={p.icon} size={18} class="mt-0.5 shrink-0" />
+  <p>{message}</p>
+</div>

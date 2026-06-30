@@ -1,0 +1,55 @@
+---
+import Icon from './ui/Icon.astro';
+
+const path = Astro.url.pathname;
+
+let title = 'Tableau de bord';
+if (path.startsWith('/clients/nouveau')) title = 'Nouveau client';
+else if (/^\/clients\/\d+\/modifier/.test(path)) title = 'Modifier le client';
+else if (/^\/clients\/\d+\/?$/.test(path)) title = 'Fiche client';
+else if (path.startsWith('/clients')) title = 'Clients';
+
+const q = Astro.url.searchParams.get('q') ?? '';
+---
+
+<header class="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-ink-200">
+  <div class="flex items-center gap-3 h-16 px-4 sm:px-6 lg:px-8">
+    <!-- Mobile sidebar toggle -->
+    <button
+      id="sidebar-toggle"
+      type="button"
+      class="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-700 hover:bg-ink-100 transition-colors"
+      aria-label="Ouvrir la navigation"
+    >
+      <Icon name="menu" size={20} />
+    </button>
+
+    <!-- Page title -->
+    <h2 class="text-base sm:text-lg font-semibold text-ink-900 tracking-tight truncate">{title}</h2>
+
+    <!-- Search (desktop only) -->
+    <form action="/clients" method="get" class="hidden lg:flex ml-auto items-center relative w-[24rem] max-w-md">
+      <Icon name="search" size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
+      <input
+        type="search"
+        name="q"
+        value={q}
+        placeholder="Rechercher un client (nom, email, téléphone…)"
+        class="w-full h-9 pl-9 pr-3 rounded-lg border border-ink-200 bg-white/80 text-sm text-ink-900 placeholder-ink-400 transition-all focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:bg-white"
+        aria-label="Rechercher"
+      />
+    </form>
+
+    <!-- Right actions -->
+    <div class="ml-auto lg:ml-0 flex items-center gap-2">
+      <a
+        href="/clients/nouveau"
+        class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 hover:shadow-md transition-all"
+      >
+        <Icon name="plus" size={16} />
+        <span class="hidden sm:inline">Nouveau client</span>
+        <span class="sm:hidden">Ajouter</span>
+      </a>
+    </div>
+  </div>
+</header>

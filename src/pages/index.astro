@@ -1,0 +1,107 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/ui/PageHeader.astro';
+import Button from '../components/ui/Button.astro';
+import Stat from '../components/ui/Stat.astro';
+import Card from '../components/ui/Card.astro';
+import EmptyState from '../components/ui/EmptyState.astro';
+import Avatar from '../components/ui/Avatar.astro';
+import TagPill from '../components/ui/TagPill.astro';
+import Icon from '../components/ui/Icon.astro';
+import { countClients, recentClients, listDistinctTags } from '../../functions/api/lib/db';
+import { fullName, formatRelative } from '../lib/format';
+
+const DB = Astro.locals.runtime.env.DB;
+
+const [total, recent, tags] = await Promise.all([
+  countClients(DB),
+  recentClients(DB, 5),
+  listDistinctTags(DB),
+]);
+---
+
+<Layout title="Sharing Fair — Tableau de bord">
+  <div class="space-y-8">
+    <PageHeader
+      title="Bonjour 👋"
+      description="Aperçu rapide de votre boutique et de votre base clients."
+    >
+      <Button slot="actions" href="/clients/nouveau" variant="primary">
+        <Icon name="plus" size={16} />
+        Nouveau client
+      </Button>
+      <Button slot="actions" href="/clients" variant="outline">
+        <Icon name="users" size={16} />
+        Voir les clients
+      </Button>
+    </PageHeader>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-stagger>
+      <Stat label="Total clients" value={total} tone="brand" hint="Toutes fiches confondues">
+        <Icon slot="icon" name="users" size={18} />
+      </Stat>
+      <Stat label="Tags actifs" value={tags.length} tone="info" hint="Catégories en usage">
+        <Icon slot="icon" name="tag" size={18} />
+      </Stat>
+      <Stat label="Version" value="0.1.0" tone="neutral" hint="MVP — gestion clients">
+        <Icon slot="icon" name="sparkles" size={18} />
+      </Stat>
+    </section>
+
+    <section class="space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-ink-900 tracking-tight">Derniers clients ajoutés</h2>
+          <p class="text-sm text-ink-500 mt-0.5">Les fiches créées le plus récemment.</p>
+        </div>
+        <a href="/clients" class="text-sm font-medium text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+          Voir tous
+          <Icon name="arrow-right" size={14} />
+        </a>
+      </div>
+
+      {recent.length === 0 ? (
+        <EmptyState
+          title="Aucun client pour l'instant"
+          description="Créez votre première fiche client pour commencer à gérer votre boutique."
+        >
+          <Icon slot="icon" name="users" size={24} />
+          <Button slot="actions" href="/clients/nouveau" variant="primary">
+            <Icon name="plus" size={16} />
+            Créer le premier client
+          </Button>
+        </EmptyState>
+      ) : (
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-stagger>
+          {recent.map((c) => (
+            <Card href={`/clients/${c.id}`} hover padded={false} class="p-5 group">
+              <div class="flex items-start gap-3">
+                <Avatar firstName={c.first_name} lastName={c.last_name} size="md" />
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-sm font-semibold text-ink-900 truncate group-hover:text-brand-700 transition-colors">
+                    {fullName(c)}
+                  </h3>
+                  {c.city && (
+                    <p class="text-xs text-ink-500 inline-flex items-center gap-1 mt-0.5">
+                      <Icon name="map-pin" size={12} />
+                      <span class="truncate">{c.city}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              {c.tags.length > 0 && (
+                <div class="flex flex-wrap gap-1 mt-3">
+                  {c.tags.slice(0, 3).map((t) => <TagPill tag={t} />)}
+                  {c.tags.length > 3 && (
+                    <span class="text-[11px] text-ink-500 font-medium px-1.5 self-center">+{c.tags.length - 3}</span>
+                  )}
+                </div>
+              )}
+              <p class="text-[11px] text-ink-400 mt-3">Ajouté {formatRelative(c.created_at)}</p>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  </div>
+</Layout>

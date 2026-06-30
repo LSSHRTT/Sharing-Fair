@@ -1,0 +1,110 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Select from '../../components/ui/Select.astro';
+import EmptyState from '../../components/ui/EmptyState.astro';
+import Pagination from '../../components/ui/Pagination.astro';
+import Icon from '../../components/ui/Icon.astro';
+import ClientCard from '../../components/clients/ClientCard.astro';
+import { listClients, listDistinctTags } from '../../../functions/api/lib/db';
+
+const DB = Astro.locals.runtime.env.DB;
+
+const q = Astro.url.searchParams.get('q')?.trim() || '';
+const tag = Astro.url.searchParams.get('tag')?.trim() || '';
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const pageSize = 20;
+
+const [result, allTags] = await Promise.all([
+  listClients(DB, { q, tag, page, pageSize }),
+  listDistinctTags(DB),
+]);
+
+const { items: clients, total, totalPages } = result;
+---
+
+<Layout title={`Clients — Sharing Fair`}>
+  <div class="space-y-6">
+    <PageHeader title={`Clients (${total})`} description="Gérez votre base de clients avec recherche et filtres.">
+      <Button slot="actions" href="/clients/nouveau" variant="primary">
+        <Icon name="plus" size={16} />
+        Nouveau client
+      </Button>
+    </PageHeader>
+
+    <!-- Search & Filters -->
+    <form method="GET" action="/clients" class="surface p-4 sm:p-5">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="flex-1 relative">
+          <Icon name="search" size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
+          <Input
+            type="search"
+            name="q"
+            value={q}
+            placeholder="Rechercher par nom, email, téléphone, ville…"
+            iconLeft
+            class="w-full"
+          />
+        </div>
+        <div class="flex gap-2 sm:flex-row">
+          <Select name="tag" class="sm:w-48">
+            <option value="">Tous les tags</option>
+            {allTags.map((t) => (
+              <option value={t} selected={tag === t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" variant="secondary">
+            <Icon name="filter" size={16} />
+            <span class="hidden sm:inline">Filtrer</span>
+          </Button>
+          {(q || tag) && (
+            <Button href="/clients" variant="ghost">
+              <Icon name="x" size={16} />
+              <span class="sr-only">Réinitialiser</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    </form>
+
+    <!-- Results -->
+    {clients.length === 0 ? (
+      <EmptyState
+        title={q || tag ? 'Aucun résultat' : 'Aucun client pour l\'instant'}
+        description={q || tag
+          ? 'Essayez de modifier vos critères de recherche ou de filtrage.'
+          : 'Créez votre première fiche client pour commencer.'}
+      >
+        <Icon slot="icon" name="users" size={24} />
+        {!(q || tag) && (
+          <Button slot="actions" href="/clients/nouveau" variant="primary">
+            <Icon name="plus" size={16} />
+            Créer le premier client
+          </Button>
+        )}
+        {(q || tag) && (
+          <Button slot="actions" href="/clients" variant="outline">
+            Réinitialiser les filtres
+          </Button>
+        )}
+      </EmptyState>
+    ) : (
+      <>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-stagger>
+          {clients.map((client) => <ClientCard client={client} />)}
+        </div>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          baseUrl="/clients"
+          searchParams={{ ...(q && { q }), ...(tag && { tag }) }}
+        />
+      </>
+    )}
+  </div>
+</Layout>

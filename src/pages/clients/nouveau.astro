@@ -1,0 +1,77 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import Toast from '../../components/ui/Toast.astro';
+import ClientForm from '../../components/clients/ClientForm.astro';
+import { clientInputSchema } from '../../../functions/api/lib/schemas';
+import { createClient } from '../../../functions/api/lib/db';
+
+const DB = Astro.locals.runtime.env.DB;
+
+let serverError: string | null = null;
+let fieldErrors: Record<string, string[]> | null = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+
+    // Parse tags from comma-separated string
+    const tagsRaw = String(form.get('tags') ?? '').trim();
+    const tags = tagsRaw
+      ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      : [];
+
+    // Build payload
+    const payload = {
+      first_name: String(form.get('first_name') ?? '').trim(),
+      last_name: String(form.get('last_name') ?? '').trim(),
+      email: String(form.get('email') ?? '').trim() || undefined,
+      phone: String(form.get('phone') ?? '').trim() || undefined,
+      address_line1: String(form.get('address_line1') ?? '').trim() || undefined,
+      address_line2: String(form.get('address_line2') ?? '').trim() || undefined,
+      postal_code: String(form.get('postal_code') ?? '').trim() || undefined,
+      city: String(form.get('city') ?? '').trim() || undefined,
+      country: String(form.get('country') ?? '').trim() || undefined,
+      birth_date: String(form.get('birth_date') ?? '').trim() || undefined,
+      preferences: String(form.get('preferences') ?? '').trim() || undefined,
+      notes: String(form.get('notes') ?? '').trim() || undefined,
+      tags,
+    };
+
+    // Validate with Zod
+    const parsed = clientInputSchema.safeParse(payload);
+    if (!parsed.success) {
+      fieldErrors = parsed.error.flatten().fieldErrors;
+      serverError = 'Certains champs contiennent des erreurs. Veuillez les corriger.';
+    } else {
+      // Create in DB
+      const created = await createClient(DB, parsed.data);
+      return Astro.redirect(`/clients/${created.id}`);
+    }
+  } catch (e) {
+    serverError = e instanceof Error ? e.message : 'Erreur inconnue lors de la création.';
+  }
+}
+---
+
+<Layout title="Nouveau client — Sharing Fair">
+  <div class="max-w-4xl mx-auto space-y-6">
+    <PageHeader
+      title="Nouveau client"
+      description="Créez une nouvelle fiche client pour votre boutique."
+      crumbs={[
+        { label: 'Clients', href: '/clients' },
+        { label: 'Nouveau' },
+      ]}
+    />
+
+    {serverError && <Toast type="danger" message={serverError} />}
+
+    <ClientForm
+      action="/clients/nouveau"
+      submitLabel="Créer le client"
+      cancelHref="/clients"
+      fieldErrors={fieldErrors}
+    />
+  </div>
+</Layout>

@@ -1,0 +1,32 @@
+---
+import { cn } from '../../lib/cn';
+
+interface Props {
+  label?: string;
+  id?: string;
+  hint?: string;
+  error?: string;
+  required?: boolean;
+  class?: string;
+}
+
+const { label, id, hint, error, required = false, class: className = '' } = Astro.props;
+---
+
+<div class={cn('space-y-1.5', className)}>
+  {label && (
+    <label for={id} class="block text-sm font-medium text-ink-800">
+      {label}
+      {required && <span class="text-brand-600 ml-0.5" aria-label="requis">*</span>}
+    </label>
+  )}
+  <slot />
+  {error ? (
+    <p class="text-xs text-danger-600 flex items-start gap-1.5 mt-1">
+      <span aria-hidden="true">⚠</span>
+      <span>{error}</span>
+    </p>
+  ) : hint ? (
+    <p class="text-xs text-ink-500">{hint}</p>
+  ) : null}
+</div>
