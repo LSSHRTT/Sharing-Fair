@@ -1,7 +1,6 @@
 ---
 import Card from '../ui/Card.astro';
 import Avatar from '../ui/Avatar.astro';
-import TagPill from '../ui/TagPill.astro';
 import Icon from '../ui/Icon.astro';
 import { fullName } from '../../lib/format';
 import type { Client } from '../../../functions/api/lib/db';
@@ -13,39 +12,31 @@ interface Props {
 const { client } = Astro.props;
 ---
 
-<Card href={`/clients/${client.id}`} hover padded={false} class="p-5 group">
-  <div class="flex items-start gap-3">
+<Card href={`/clients/${client.id}`} hover padded={false} class="p-5 group relative">
+  <div class="flex items-center gap-3">
     <Avatar firstName={client.first_name} lastName={client.last_name} size="md" />
     <div class="min-w-0 flex-1">
-      <h3 class="text-sm font-semibold text-ink-900 truncate group-hover:text-brand-700 transition-colors">
+      <h3 class="font-display text-lg font-medium text-ink-900 truncate group-hover:text-brand-700 transition-colors">
         {fullName(client)}
       </h3>
-      {client.email && (
-        <p class="text-xs text-ink-500 truncate inline-flex items-center gap-1 mt-0.5">
-          <Icon name="mail" size={12} />
-          <span class="truncate">{client.email}</span>
-        </p>
-      )}
-      {client.phone && (
-        <p class="text-xs text-ink-500 truncate inline-flex items-center gap-1 mt-0.5">
-          <Icon name="phone" size={12} />
-          <span class="truncate">{client.phone}</span>
-        </p>
-      )}
+      <p class="text-[11px] text-ink-400 mt-0.5">Fiche client</p>
     </div>
+    <Icon name="arrow-right" size={14} class="text-ink-300 group-hover:text-brand-500 group-hover:translate-x-0.5 transition-all" />
   </div>
 
-  {(client.city || client.tags.length > 0) && (
-    <div class="mt-3 flex flex-wrap gap-1.5 items-center">
-      {client.city && (
-        <span class="inline-flex items-center gap-1 text-[11px] font-medium text-ink-600 bg-ink-100 px-2 py-0.5 rounded-full">
-          <Icon name="map-pin" size={11} />
-          {client.city}
-        </span>
+  {(client.phone || client.email) && (
+    <div class="flex flex-col gap-1.5 mt-4 pt-4 border-t border-ink-100">
+      {client.phone && (
+        <div class="flex items-center gap-2 text-xs text-ink-600">
+          <Icon name="phone" size={12} class="text-ink-400 shrink-0" />
+          <span class="truncate">{client.phone}</span>
+        </div>
       )}
-      {client.tags.slice(0, 3).map((t) => <TagPill tag={t} />)}
-      {client.tags.length > 3 && (
-        <span class="text-[11px] text-ink-500 font-medium px-1 self-center">+{client.tags.length - 3}</span>
+      {client.email && (
+        <div class="flex items-center gap-2 text-xs text-ink-600">
+          <Icon name="mail" size={12} class="text-ink-400 shrink-0" />
+          <span class="truncate">{client.email}</span>
+        </div>
       )}
     </div>
   )}

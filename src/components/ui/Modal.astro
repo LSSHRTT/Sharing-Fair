@@ -1,0 +1,120 @@
+---
+interface Props {
+  open?: boolean;
+  title: string;
+  description?: string;
+  cancelLabel?: string;
+  confirmLabel?: string;
+  confirmVariant?: 'primary' | 'danger';
+  onClose?: string;
+  class?: string;
+}
+
+const {
+  open = false,
+  title,
+  description,
+  cancelLabel = 'Annuler',
+  confirmLabel = 'Confirmer',
+  confirmVariant = 'primary',
+  onClose,
+  class: className = '',
+} = Astro.props;
+---
+
+<div
+  class={`fixed inset-0 z-[1000] ${open ? '' : 'hidden'}`}
+  role="dialog"
+  aria-modal="true"
+  data-modal
+>
+  <!-- Backdrop -->
+  <div
+    class="fixed inset-0 bg-ink-900/40 backdrop-blur-sm animate-fade-in"
+    data-modal-backdrop
+    aria-hidden="true"
+  ></div>
+
+  <!-- Panel -->
+  <div class="fixed inset-0 overflow-y-auto">
+    <div class="flex min-h-full items-end sm:items-center justify-center p-4 sm:p-0">
+      <div
+        class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-scale-in"
+        data-modal-panel
+      >
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-xl font-semibold text-ink-900 font-display">
+              {title}
+            </h3>
+            {description && (
+              <p class="text-sm text-ink-600 mt-2 leading-relaxed">
+                {description}
+              </p>
+            )}
+          </div>
+
+          <slot />
+
+          <div class="flex items-center gap-2 pt-2">
+            <button
+              type="button"
+              data-modal-cancel
+              class="flex-1 h-11 px-4 rounded-lg border border-ink-200 text-sm font-medium text-ink-700 hover:bg-ink-50 transition-colors"
+            >
+              {cancelLabel}
+            </button>
+            <button
+              type="submit"
+              data-modal-confirm
+              class={`flex-1 h-11 px-4 rounded-lg text-sm font-medium text-white transition-all ${
+                confirmVariant === 'danger'
+                  ? 'bg-danger-500 hover:bg-danger-600'
+                  : 'bg-brand-500 hover:bg-brand-600'
+              }`}
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-modal-trigger]');
+    if (!trigger) return;
+
+    const targetId = trigger.getAttribute('data-modal-trigger');
+    const modal = document.querySelector(`[data-modal][data-modal-id="${targetId}"]`);
+    if (modal) {
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const backdrop = e.target.closest('[data-modal-backdrop]');
+    const cancel = e.target.closest('[data-modal-cancel]');
+
+    if (backdrop || cancel) {
+      const modal = (backdrop || cancel).closest('[data-modal]');
+      if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const modal = document.querySelector('[data-modal]:not(.hidden)');
+      if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    }
+  });
+</script>

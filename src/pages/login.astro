@@ -11,14 +11,10 @@ import {
   sessionCookieMaxAge,
 } from '../lib/auth';
 
-const runtime: any = (Astro.locals as any).runtime;
-const env: any = runtime?.env;
+const env = Astro.locals.runtime.env;
 let error: string | null = null;
 const nextParam = new URL(Astro.request.url).searchParams.get('next') || '/';
 const safeNext = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
-
-const envKeys = env ? Object.keys(env).sort().join(', ') : '(env undefined)';
-const runtimeShape = runtime ? Object.keys(runtime).sort().join(', ') : '(runtime undefined)';
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
@@ -26,25 +22,19 @@ if (Astro.request.method === 'POST') {
   const submittedNext = String(form.get('next') ?? '/');
   const target = submittedNext.startsWith('/') && !submittedNext.startsWith('//') ? submittedNext : '/';
 
-  if (!env?.AUTH_PASSWORD) {
-    error = `DIAG: AUTH_PASSWORD absent. runtime keys=[${runtimeShape}] env keys=[${envKeys}]`;
-  } else if (!env?.AUTH_SECRET) {
-    error = `DIAG: AUTH_SECRET absent. env keys=[${envKeys}]`;
-  } else {
-    const ok = await passwordMatches(password, env.AUTH_PASSWORD);
-    if (ok) {
-      const token = await createSessionToken(env.AUTH_SECRET);
-      Astro.cookies.set(sessionCookieName(), token, {
-        path: '/',
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        maxAge: sessionCookieMaxAge(),
-      });
-      return Astro.redirect(target, 302);
-    }
-    error = `DIAG: Mot de passe incorrect. Longueur saisie: ${password.length}, attendue: ${env.AUTH_PASSWORD.length}.`;
+  const ok = await passwordMatches(password, env.AUTH_PASSWORD);
+  if (ok) {
+    const token = await createSessionToken(env.AUTH_SECRET);
+    Astro.cookies.set(sessionCookieName(), token, {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: sessionCookieMaxAge(),
+    });
+    return Astro.redirect(target, 302);
   }
+  error = 'Mot de passe incorrect.';
 }
 ---
 
@@ -62,43 +52,63 @@ if (Astro.request.method === 'POST') {
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" />
     <title>Connexion · Sharing Fair</title>
   </head>
-  <body class="min-h-screen flex items-center justify-center px-4 py-10">
-    <div class="w-full max-w-md">
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-md ring-1 ring-brand-300/40 mb-4">
-          <Icon name="sparkles" size={24} class="text-white" />
-        </div>
-        <h1 class="font-display text-4xl text-ink-900 mb-1">Sharing Fair</h1>
-        <p class="text-sm text-ink-500">La boutique solidaire</p>
-      </div>
-
-      <form method="POST" class="surface p-6 sm:p-7 space-y-5" autocomplete="off">
-        <input type="hidden" name="next" value={safeNext} />
-
-        <Field label="Mot de passe" required for="password">
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autocomplete="current-password"
-            hasError={error !== null}
-          />
-        </Field>
-
-        {error && (
-          <p class="text-sm text-danger-700 bg-danger-50 border border-danger-100 rounded-lg px-3 py-2 flex items-start gap-2">
-            <Icon name="info" size={16} class="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </p>
-        )}
-
-        <Button type="submit" variant="primary" fullWidth size="lg">
-          Se connecter
-          <Icon name="arrow-right" size={16} />
-        </Button>
-      </form>
-
+  <body class="min-h-screen relative overflow-hidden">
+    <!-- Decorative background -->
+    <div class="absolute inset-0 -z-10" aria-hidden="true">
+      <div class="absolute top-0 left-0 w-[600px] h-[600px] bg-brand-200/30 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3"></div>
+      <div class="absolute bottom-0 right-0 w-[500px] h-[500px] bg-accent-200/30 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
+      <div class="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-brand-100/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
     </div>
+
+    <div class="min-h-screen flex items-center justify-center px-4 py-10">
+      <div class="w-full max-w-md animate-fade-in">
+        <div class="text-center mb-8 animate-slide-up">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-lg ring-1 ring-brand-300/40 mb-4 animate-scale-in">
+            <Icon name="sparkles" size={28} class="text-white" />
+          </div>
+          <h1 class="font-display text-5xl text-ink-900 mb-1 tracking-tight">Sharing Fair</h1>
+          <p class="text-sm text-ink-500 font-display italic">La boutique solidaire</p>
+        </div>
+
+        <form
+          method="POST"
+          class={`surface p-6 sm:p-8 space-y-5 ${error ? 'animate-shake' : 'animate-slide-up'}`}
+          style={error ? '' : 'animation-delay: 0.1s'}
+          autocomplete="off"
+        >
+          <input type="hidden" name="next" value={safeNext} />
+
+          <Field label="Mot de passe" required for="password">
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autocomplete="current-password"
+              hasError={error !== null}
+            />
+          </Field>
+
+          {error && (
+            <p class="text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
+              <Icon name="info" size={16} class="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </p>
+          )}
+
+          <Button type="submit" variant="primary" fullWidth size="lg">
+            Se connecter
+            <Icon name="arrow-right" size={16} />
+          </Button>
+        </form>
+      </div>
+    </div>
+
+    <script is:inline>
+      requestAnimationFrame(() => {
+        const input = document.getElementById('password');
+        if (input) input.focus();
+      });
+    </script>
   </body>
 </html>

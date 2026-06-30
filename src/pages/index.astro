@@ -1,66 +1,118 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import PageHeader from '../components/ui/PageHeader.astro';
 import Button from '../components/ui/Button.astro';
-import Stat from '../components/ui/Stat.astro';
 import Card from '../components/ui/Card.astro';
 import EmptyState from '../components/ui/EmptyState.astro';
 import Avatar from '../components/ui/Avatar.astro';
-import TagPill from '../components/ui/TagPill.astro';
 import Icon from '../components/ui/Icon.astro';
-import { countClients, recentClients, listDistinctTags } from '../../functions/api/lib/db';
+import { countClients, recentClients } from '../../functions/api/lib/db';
 import { fullName, formatRelative } from '../lib/format';
 
 const DB = Astro.locals.runtime.env.DB;
 
-const [total, recent, tags] = await Promise.all([
+const [total, recent] = await Promise.all([
   countClients(DB),
-  recentClients(DB, 5),
-  listDistinctTags(DB),
+  recentClients(DB, 6),
 ]);
+
+const hour = new Date().getHours();
+const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 ---
 
 <Layout title="Sharing Fair — Tableau de bord">
-  <div class="space-y-8">
-    <PageHeader title="Tableau de bord">
-      <Button slot="actions" href="/clients/nouveau" variant="primary">
-        <Icon name="plus" size={16} />
-        Nouveau client
-      </Button>
-      <Button slot="actions" href="/clients" variant="outline">
-        <Icon name="users" size={16} />
-        Voir les clients
-      </Button>
-    </PageHeader>
+  <div class="space-y-10">
+    <!-- Hero -->
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white p-8 sm:p-10 shadow-lg">
+      <div class="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" aria-hidden="true"></div>
+      <div class="absolute bottom-0 left-0 w-72 h-72 bg-brand-900/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" aria-hidden="true"></div>
 
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-stagger>
-      <Stat label="Total clients" value={total} tone="brand" hint="Toutes fiches confondues">
-        <Icon slot="icon" name="users" size={18} />
-      </Stat>
-      <Stat label="Tags actifs" value={tags.length} tone="info" hint="Catégories en usage">
-        <Icon slot="icon" name="tag" size={18} />
-      </Stat>
-      <Stat label="Version" value="0.1.0" tone="neutral" hint="MVP — gestion clients">
-        <Icon slot="icon" name="sparkles" size={18} />
-      </Stat>
+      <div class="relative max-w-3xl">
+        <p class="text-sm font-display italic text-brand-100 mb-2">{greeting}</p>
+        <h1 class="font-display text-4xl sm:text-5xl tracking-tight mb-3">Sharing Fair</h1>
+        <p class="text-brand-50/90 text-base sm:text-lg leading-relaxed mb-6 max-w-xl">
+          Votre espace dédié à la gestion des clients de la boutique solidaire.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a
+            href="/clients/nouveau"
+            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-white text-brand-700 text-sm font-semibold shadow-md hover:shadow-lg hover:-translate-y-px transition-all"
+          >
+            <Icon name="plus" size={16} />
+            Nouveau client
+          </a>
+          <a
+            href="/clients"
+            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm font-medium hover:bg-white/20 transition-all"
+          >
+            <Icon name="users" size={16} />
+            Voir tous les clients
+          </a>
+        </div>
+      </div>
     </section>
 
-    <section class="space-y-4">
-      <div class="flex items-center justify-between flex-wrap gap-3">
+    <!-- Stats -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4" data-stagger>
+      <Card class="p-5 relative overflow-hidden surface-hover">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-brand-100/40 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3" aria-hidden="true"></div>
+        <div class="relative flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">Clients</p>
+            <p class="font-display text-4xl text-ink-900">{total}</p>
+            <p class="text-xs text-ink-400 mt-1">fiche{total > 1 ? 's' : ''} au total</p>
+          </div>
+          <span class="w-11 h-11 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
+            <Icon name="users" size={20} />
+          </span>
+        </div>
+      </Card>
+
+      <Card class="p-5 relative overflow-hidden surface-hover">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-accent-100/40 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3" aria-hidden="true"></div>
+        <div class="relative flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">Récents</p>
+            <p class="font-display text-4xl text-ink-900">{recent.length}</p>
+            <p class="text-xs text-ink-400 mt-1">derniers ajouts</p>
+          </div>
+          <span class="w-11 h-11 rounded-xl bg-accent-100 text-accent-700 flex items-center justify-center shrink-0">
+            <Icon name="sparkles" size={20} />
+          </span>
+        </div>
+      </Card>
+
+      <Card class="p-5 relative overflow-hidden surface-hover">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-info-100/40 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3" aria-hidden="true"></div>
+        <div class="relative flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">Version</p>
+            <p class="font-display text-4xl text-ink-900">0.1</p>
+            <p class="text-xs text-ink-400 mt-1">MVP en cours</p>
+          </div>
+          <span class="w-11 h-11 rounded-xl bg-info-100 text-info-700 flex items-center justify-center shrink-0">
+            <Icon name="heart" size={20} />
+          </span>
+        </div>
+      </Card>
+    </section>
+
+    <!-- Recent clients -->
+    <section class="space-y-5">
+      <div class="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h2 class="text-lg font-semibold text-ink-900 tracking-tight">Derniers clients ajoutés</h2>
+          <h2 class="font-display text-2xl text-ink-900 tracking-tight">Derniers clients</h2>
           <p class="text-sm text-ink-500 mt-0.5">Les fiches créées le plus récemment.</p>
         </div>
-        <a href="/clients" class="text-sm font-medium text-brand-700 hover:text-brand-800 inline-flex items-center gap-1">
+        <a href="/clients" class="text-sm font-medium text-brand-700 hover:text-brand-800 inline-flex items-center gap-1 group">
           Voir tous
-          <Icon name="arrow-right" size={14} />
+          <Icon name="arrow-right" size={14} class="group-hover:translate-x-0.5 transition-transform" />
         </a>
       </div>
 
       {recent.length === 0 ? (
         <EmptyState
           title="Aucun client pour l'instant"
-          description="Créez votre première fiche client pour commencer à gérer votre boutique."
+          description="Créez votre première fiche client pour commencer."
         >
           <Icon slot="icon" name="users" size={24} />
           <Button slot="actions" href="/clients/nouveau" variant="primary">
@@ -72,29 +124,32 @@ const [total, recent, tags] = await Promise.all([
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-stagger>
           {recent.map((c) => (
             <Card href={`/clients/${c.id}`} hover padded={false} class="p-5 group">
-              <div class="flex items-start gap-3">
+              <div class="flex items-center gap-3">
                 <Avatar firstName={c.first_name} lastName={c.last_name} size="md" />
                 <div class="min-w-0 flex-1">
-                  <h3 class="text-sm font-semibold text-ink-900 truncate group-hover:text-brand-700 transition-colors">
+                  <h3 class="font-display text-lg font-medium text-ink-900 truncate group-hover:text-brand-700 transition-colors">
                     {fullName(c)}
                   </h3>
-                  {c.city && (
-                    <p class="text-xs text-ink-500 inline-flex items-center gap-1 mt-0.5">
-                      <Icon name="map-pin" size={12} />
-                      <span class="truncate">{c.city}</span>
-                    </p>
-                  )}
+                  <p class="text-[11px] text-ink-400 mt-0.5">Ajouté {formatRelative(c.created_at)}</p>
                 </div>
+                <Icon name="arrow-right" size={14} class="text-ink-300 group-hover:text-brand-500 group-hover:translate-x-0.5 transition-all" />
               </div>
-              {c.tags.length > 0 && (
-                <div class="flex flex-wrap gap-1 mt-3">
-                  {c.tags.slice(0, 3).map((t) => <TagPill tag={t} />)}
-                  {c.tags.length > 3 && (
-                    <span class="text-[11px] text-ink-500 font-medium px-1.5 self-center">+{c.tags.length - 3}</span>
+              {(c.phone || c.email) && (
+                <div class="flex flex-col gap-1.5 mt-4 pt-4 border-t border-ink-100">
+                  {c.phone && (
+                    <div class="flex items-center gap-2 text-xs text-ink-600">
+                      <Icon name="phone" size={12} class="text-ink-400" />
+                      <span class="truncate">{c.phone}</span>
+                    </div>
+                  )}
+                  {c.email && (
+                    <div class="flex items-center gap-2 text-xs text-ink-600">
+                      <Icon name="mail" size={12} class="text-ink-400" />
+                      <span class="truncate">{c.email}</span>
+                    </div>
                   )}
                 </div>
               )}
-              <p class="text-[11px] text-ink-400 mt-3">Ajouté {formatRelative(c.created_at)}</p>
             </Card>
           ))}
         </div>

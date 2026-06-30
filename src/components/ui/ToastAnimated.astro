@@ -1,0 +1,102 @@
+---
+interface Props {
+  type?: 'success' | 'danger' | 'warning' | 'info';
+  message: string;
+  duration?: number;
+}
+
+const {
+  type = 'info',
+  message,
+  duration = 5000,
+} = Astro.props;
+
+const icons = {
+  success: 'check',
+  danger: 'x',
+  warning: 'info',
+  info: 'info',
+};
+
+const colors = {
+  success: 'bg-success-50 border-success-200 text-success-800',
+  danger: 'bg-danger-50 border-danger-200 text-danger-800',
+  warning: 'bg-warning-50 border-warning-200 text-warning-800',
+  info: 'bg-info-50 border-info-200 text-info-800',
+};
+---
+
+<div
+  class={`fixed top-4 right-4 z-[2000] max-w-md w-full pointer-events-auto animate-slide-down`}
+  data-toast
+  data-duration={duration}
+>
+  <div class={`flex items-start gap-3 p-4 rounded-xl border shadow-lg ${colors[type]}`}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="shrink-0 mt-0.5"
+    >
+      {type === 'success' && <path d="m5 12 5 5L20 7" />}
+      {type === 'danger' && <path d="M18 6 6 18M6 6l12 12" />}
+      {(type === 'warning' || type === 'info') && (
+        <>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </>
+      )}
+    </svg>
+    <p class="text-sm font-medium leading-relaxed flex-1">{message}</p>
+    <button
+      type="button"
+      class="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+      data-toast-close
+      aria-label="Fermer"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    const toast = document.querySelector('[data-toast]');
+    if (!toast) return;
+
+    const duration = parseInt(toast.getAttribute('data-duration') || '5000', 10);
+    const closeBtn = toast.querySelector('[data-toast-close]');
+
+    const remove = () => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-8px)';
+      setTimeout(() => toast.remove(), 200);
+    };
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', remove);
+    }
+
+    if (duration > 0) {
+      setTimeout(remove, duration);
+    }
+  });
+</script>
