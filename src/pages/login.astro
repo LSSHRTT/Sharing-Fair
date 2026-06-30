@@ -1,0 +1,97 @@
+---
+import '../styles/global.css';
+import Button from '../components/ui/Button.astro';
+import Input from '../components/ui/Input.astro';
+import Field from '../components/ui/Field.astro';
+import Icon from '../components/ui/Icon.astro';
+import {
+  passwordMatches,
+  createSessionToken,
+  sessionCookieName,
+  sessionCookieMaxAge,
+} from '../lib/auth';
+
+const env = Astro.locals.runtime.env;
+let error: string | null = null;
+const nextParam = new URL(Astro.request.url).searchParams.get('next') || '/';
+const safeNext = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const password = String(form.get('password') ?? '');
+  const submittedNext = String(form.get('next') ?? '/');
+  const target = submittedNext.startsWith('/') && !submittedNext.startsWith('//') ? submittedNext : '/';
+
+  const ok = await passwordMatches(password, env.AUTH_PASSWORD);
+  if (ok) {
+    const token = await createSessionToken(env.AUTH_SECRET);
+    Astro.cookies.set(sessionCookieName(), token, {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: sessionCookieMaxAge(),
+    });
+    return Astro.redirect(target, 302);
+  }
+  error = 'Mot de passe incorrect.';
+}
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#C65D3A" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://rsms.me" crossorigin />
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" />
+    <title>Connexion · Sharing Fair</title>
+  </head>
+  <body class="min-h-screen flex items-center justify-center px-4 py-10">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-md ring-1 ring-brand-300/40 mb-4">
+          <Icon name="sparkles" size={24} class="text-white" />
+        </div>
+        <h1 class="font-display text-4xl text-ink-900 mb-1">Sharing Fair</h1>
+        <p class="text-sm text-ink-500">Espace réservé · entrez votre mot de passe</p>
+      </div>
+
+      <form method="POST" class="surface p-6 sm:p-7 space-y-5" autocomplete="off">
+        <input type="hidden" name="next" value={safeNext} />
+
+        <Field label="Mot de passe" required for="password">
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            hasError={error !== null}
+          />
+        </Field>
+
+        {error && (
+          <p class="text-sm text-danger-700 bg-danger-50 border border-danger-100 rounded-lg px-3 py-2 flex items-start gap-2">
+            <Icon name="info" size={16} class="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </p>
+        )}
+
+        <Button type="submit" variant="primary" fullWidth size="lg">
+          Se connecter
+          <Icon name="arrow-right" size={16} />
+        </Button>
+      </form>
+
+      <p class="text-center text-xs text-ink-400 mt-6 font-display italic">
+        Fabriqué avec soin
+      </p>
+    </div>
+  </body>
+</html>
