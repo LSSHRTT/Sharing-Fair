@@ -11,6 +11,7 @@ interface Props {
   submitLabel: string;
   cancelHref?: string;
   fieldErrors?: Record<string, string[]> | null;
+  allowImport?: boolean;
 }
 
 const {
@@ -19,28 +20,36 @@ const {
   submitLabel,
   cancelHref = '/clients',
   fieldErrors = null,
+  allowImport = false,
 } = Astro.props;
 
 const errFor = (field: string): string | undefined =>
   fieldErrors?.[field]?.[0];
 ---
 
-<form method="POST" action={action} class="space-y-6" novalidate data-client-form>
-  <!-- Import depuis les contacts du téléphone (Contact Picker API, mobile uniquement) -->
-  <div data-contact-import hidden>
-    <div class="surface p-4 sm:p-5 flex items-start gap-3 border-brand-200 bg-brand-50/40">
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-ink-800">Importer depuis mes contacts</p>
-        <p class="text-xs text-ink-500 mt-0.5">
-          Sélectionnez un contact de votre téléphone pour remplir automatiquement les champs.
-        </p>
+{allowImport && (
+  <!-- Import des contacts du téléphone (Contact Picker API, mobile uniquement) -->
+  <div data-contact-import hidden class="mb-6">
+    <div class="surface p-4 sm:p-5 border-brand-200 bg-brand-50/40 space-y-3">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-ink-800">Importer depuis mes contacts</p>
+          <p class="text-xs text-ink-500 mt-0.5">
+            Sélectionnez un ou plusieurs contacts de votre téléphone. Les clients déjà
+            enregistrés (même nom, téléphone ou email) seront ignorés pour éviter les doublons.
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="md" data-contact-pick>
+          <Icon name="users" size={16} />
+          Importer des contacts
+        </Button>
       </div>
-      <Button type="button" variant="outline" size="md" data-contact-pick>
-        <Icon name="users" size={16} />
-        Choisir un contact
-      </Button>
+      <p data-import-status role="status" aria-live="polite" hidden class="text-sm rounded-lg px-3 py-2.5"></p>
     </div>
   </div>
+)}
+
+<form method="POST" action={action} class="space-y-6" novalidate data-client-form>
   <section class="surface p-5 sm:p-6 space-y-4">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Prénom" id="first_name" required error={errFor('first_name')}>
@@ -101,7 +110,7 @@ const errFor = (field: string): string | undefined =>
 </form>
 
 <script>
-  // Import de contact via la Contact Picker API (Chrome/Edge sur Android, HTTPS requis).
+  // Import de contacts via la Contact Picker API (Chrome/Edge sur Android, HTTPS requis).
   // https://developer.mozilla.org/docs/Web/API/Contact_Picker_API
   type ContactInfo = {
     name?: string[];
@@ -115,25 +124,37 @@ const errFor = (field: string): string | undefined =>
     ): Promise<ContactInfo[]>;
     getProperties(): Promise<string[]>;
   }
+  type ImportContact = {
+    first_name: string;
+    last_name: string;
+    phone: string;
+    email: string;
+  };
 
   const nav = navigator as Navigator & { contacts?: ContactsManager };
-  const form = document.querySelector<HTMLFormElement>('[data-client-form]');
   const importBox = document.querySelector<HTMLElement>('[data-contact-import]');
   const pickBtn = document.querySelector<HTMLButtonElement>('[data-contact-pick]');
+  const statusEl = document.querySelector<HTMLElement>('[data-import-status]');
 
   const supported =
     !!nav.contacts &&
     typeof nav.contacts.select === 'function' &&
     'ContactsManager' in window;
 
-  if (supported && form && importBox && pickBtn) {
+  if (supported && importBox && pickBtn) {
     // Affiche le bloc d'import uniquement si l'appareil le supporte.
     importBox.hidden = false;
 
-    const setField = (name: string, value: string | undefined) => {
-      if (!value) return;
-      const el = form.elements.namedItem(name) as HTMLInputElement | null;
-      if (el && !el.value.trim()) el.value = value;
+    const setStatus = (msg: string, kind: 'info' | 'success' | 'error') => {
+      if (!statusEl) return;
+      const styles = {
+        info: 'bg-ink-100 text-ink-700',
+        success: 'bg-brand-100 text-brand-800',
+        error: 'bg-danger-50 text-danger-700 border border-danger-200',
+      };
+      statusEl.className = `text-sm rounded-lg px-3 py-2.5 ${styles[kind]}`;
+      statusEl.textContent = msg;
+      statusEl.hidden = false;
     };
 
     // Découpe un nom complet en prénom / nom.
@@ -143,31 +164,78 @@ const errFor = (field: string): string | undefined =>
       return { first: parts[0], last: parts.slice(1).join(' ') };
     };
 
+    const toContact = (c: ContactInfo): ImportContact => {
+      const full = c.name?.[0]?.trim() ?? '';
+      const phone = c.tel?.[0]?.trim() ?? '';
+      const email = c.email?.[0]?.trim() ?? '';
+      let first = '';
+      let last = '';
+      if (full) {
+        const s = splitName(full);
+        first = s.first;
+        last = s.last;
+      }
+      // Repli si le contact n'a pas de nom exploitable.
+      if (!first) first = phone || email || 'Contact';
+      return { first_name: first, last_name: last, phone, email };
+    };
+
     pickBtn.addEventListener('click', async () => {
       try {
         const supportedProps = await nav.contacts!.getProperties();
         const props = ['name', 'email', 'tel'].filter((p) =>
           supportedProps.includes(p)
         );
-        const contacts = await nav.contacts!.select(props, { multiple: false });
-        if (!contacts.length) return;
+        const selected = await nav.contacts!.select(props, { multiple: true });
+        if (!selected.length) return;
 
-        const c = contacts[0];
-        const fullName = c.name?.[0]?.trim();
-        if (fullName) {
-          const { first, last } = splitName(fullName);
-          setField('first_name', first);
-          setField('last_name', last);
+        const clients = selected.map(toContact);
+
+        pickBtn.disabled = true;
+        setStatus(`Import de ${clients.length} contact(s) en cours…`, 'info');
+
+        const res = await fetch('/api/clients/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clients }),
+        });
+        const json = await res.json();
+
+        if (!res.ok || !json.ok) {
+          throw new Error(json?.error ?? 'Erreur lors de l’import');
         }
-        setField('phone', c.tel?.[0]);
-        setField('email', c.email?.[0]);
 
-        // Petit retour visuel : focus sur le premier champ vide restant.
-        const firstEl = form.elements.namedItem('first_name') as HTMLInputElement | null;
-        firstEl?.focus();
+        const { createdCount, skippedCount } = json.data as {
+          createdCount: number;
+          skippedCount: number;
+        };
+
+        const parts: string[] = [];
+        parts.push(
+          createdCount > 0
+            ? `${createdCount} client(s) ajouté(s)`
+            : 'Aucun nouveau client'
+        );
+        if (skippedCount > 0) {
+          parts.push(`${skippedCount} ignoré(s) (déjà présent(s))`);
+        }
+
+        if (createdCount > 0) {
+          setStatus(`${parts.join(' · ')}. Redirection…`, 'success');
+          setTimeout(() => {
+            window.location.href = '/clients';
+          }, 1200);
+        } else {
+          setStatus(parts.join(' · ') + '.', 'info');
+          pickBtn.disabled = false;
+        }
       } catch (err) {
-        // L'utilisateur a annulé ou erreur : on reste silencieux.
-        console.warn('Import de contact annulé ou impossible:', err);
+        console.warn('Import de contacts impossible:', err);
+        setStatus(
+          err instanceof Error ? err.message : 'Import impossible.',
+          'error'
+        );
+        pickBtn.disabled = false;
       }
     });
   }

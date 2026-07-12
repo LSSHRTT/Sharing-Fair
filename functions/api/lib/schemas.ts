@@ -53,6 +53,37 @@ export const clientInputSchema = z.object({
 
 export type ClientInputData = z.infer<typeof clientInputSchema>;
 
+// --- Import de contacts (en masse, tolérant) ---
+// Email tolérant : si invalide, on l'ignore (null) au lieu de rejeter tout le lot.
+const lenientEmail = z.preprocess((v) => {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (!t) return null;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t) ? t : null;
+}, z.string().nullable().optional());
+
+const lenientText = z.preprocess((v) => {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t === "" ? null : t.slice(0, 500);
+}, z.string().nullable().optional());
+
+export const importContactSchema = z.object({
+  first_name: z.string().trim().min(1, "Prénom requis").max(100, "Trop long"),
+  last_name: z.string().trim().max(100, "Trop long").default(""),
+  email: lenientEmail,
+  phone: lenientText,
+});
+
+export const clientImportSchema = z.object({
+  clients: z
+    .array(importContactSchema)
+    .min(1, "Aucun contact fourni")
+    .max(500, "Trop de contacts (500 max par import)"),
+});
+
+export type ClientImportData = z.infer<typeof clientImportSchema>;
+
 export const clientQuerySchema = z.object({
   q: z.string().trim().optional().default(""),
   tag: z.string().trim().optional().default(""),

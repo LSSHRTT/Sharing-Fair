@@ -276,3 +276,87 @@ export async function listDistinctTags(db: D1Database): Promise<string[]> {
   }
   return [...set].sort((a, b) => a.localeCompare(b, "fr"));
 }
+
+// --- Import en masse avec déduplication ---
+
+export interface ImportSummary {
+  createdCount: number;
+  skippedCount: number;
+  created: { id: number; name: string }[];
+  skipped: { name: string; reason: string }[];
+}
+
+const normEmail = (s?: string | null): string => (s ?? "").trim().toLowerCase();
+const normPhone = (s?: string | null): string => (s ?? "").replace(/\D+/g, "");
+const normName = (first?: string | null, last?: string | null): string =>
+  `${(first ?? "").trim().toLowerCase()}|${(last ?? "").trim().toLowerCase()}`;
+
+/**
+ * Crée plusieurs clients en une fois en ignorant les doublons.
+ * Un contact est considéré comme un doublon s'il correspond à un client
+ * existant (ou à un contact déjà traité dans le même lot) par :
+ *  - email identique, ou
+ *  - numéro de téléphone identique (chiffres uniquement), ou
+ *  - prénom + nom identiques.
+ */
+export async function bulkImportClients(
+  db: D1Database,
+  inputs: ClientInput[],
+): Promise<ImportSummary> {
+  const existing = await db
+    .prepare("SELECT first_name, last_name, email, phone FROM clients")
+    .all<{
+      first_name: string;
+      last_name: string;
+      email: string | null;
+      phone: string | null;
+    }>();
+
+  const emailSet = new Set<string>();
+  const phoneSet = new Set<string>();
+  const nameSet = new Set<string>();
+
+  for (const r of existing.results) {
+    const e = normEmail(r.email);
+    if (e) emailSet.add(e);
+    const p = normPhone(r.phone);
+    if (p) phoneSet.add(p);
+    const n = normName(r.first_name, r.last_name);
+    if (n !== "|") nameSet.add(n);
+  }
+
+  const created: { id: number; name: string }[] = [];
+  const skipped: { name: string; reason: string }[] = [];
+
+  for (const input of inputs) {
+    const label = `${input.first_name} ${input.last_name ?? ""}`.trim();
+    const e = normEmail(input.email);
+    const p = normPhone(input.phone);
+    const n = normName(input.first_name, input.last_name);
+
+    let reason: string | null = null;
+    if (e && emailSet.has(e)) reason = "email déjà présent";
+    else if (p && phoneSet.has(p)) reason = "téléphone déjà présent";
+    else if (n !== "|" && nameSet.has(n)) reason = "nom déjà présent";
+
+    if (reason) {
+      skipped.push({ name: label, reason });
+      continue;
+    }
+
+    const client = await createClient(db, input);
+    created.push({ id: client.id, name: label });
+
+    // Empêche les doublons au sein du même lot.
+    if (e) emailSet.add(e);
+    if (p) phoneSet.add(p);
+    if (n !== "|") nameSet.add(n);
+  }
+
+  return {
+    createdCount: created.length,
+    skippedCount: skipped.length,
+    created,
+    skipped,
+  };
+}

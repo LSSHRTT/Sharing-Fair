@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { clientInputSchema, clientQuerySchema } from "./lib/schemas";
+import { clientInputSchema, clientQuerySchema, clientImportSchema } from "./lib/schemas";
 import {
   listClients,
   getClient,
@@ -7,6 +7,7 @@ import {
   updateClient,
   deleteClient,
   listDistinctTags,
+  bulkImportClients,
 } from "./lib/db";
 import { jsonOk, jsonError } from "./lib/response";
 
@@ -44,6 +45,21 @@ app.post("/clients", async (c) => {
   }
   const created = await createClient(c.env.DB, parsed.data);
   return jsonOk(created, 201);
+});
+
+app.post("/clients/import", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return jsonError("JSON invalide", 400);
+  }
+  const parsed = clientImportSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError("Validation échouée", 400, parsed.error.flatten());
+  }
+  const summary = await bulkImportClients(c.env.DB, parsed.data.clients);
+  return jsonOk(summary, 201);
 });
 
 app.get("/clients/:id", async (c) => {
