@@ -13,6 +13,23 @@ const { client } = Astro.props;
 ---
 
 <Card href={`/clients/${client.id}`} hover padded={false} class="p-5 group relative">
+  {client.email && (
+    <label
+      class="absolute top-3 right-3 z-10 flex items-center justify-center w-6 h-6 rounded-md border border-ink-200 bg-white/90 backdrop-blur-sm cursor-pointer shadow-xs hover:border-brand-400 hover:bg-brand-50 transition-colors has-checked:bg-brand-500 has-checked:border-brand-500 has-checked:[&_svg]:opacity-100"
+      title={`Sélectionner ${fullName(client)} pour un envoi groupé`}
+      data-card-checkbox-label
+    >
+      <input
+        type="checkbox"
+        class="sr-only"
+        data-email-checkbox
+        value={client.email}
+        data-name={fullName(client)}
+        aria-label={`Sélectionner ${fullName(client)}`}
+      />
+      <Icon name="check" size={13} class="text-white opacity-0 transition-opacity pointer-events-none" stroke-width={3} />
+    </label>
+  )}
   <div class="flex items-center gap-3">
     <Avatar firstName={client.first_name} lastName={client.last_name} size="md" />
     <div class="min-w-0 flex-1">
@@ -41,3 +58,19 @@ const { client } = Astro.props;
     </div>
   )}
 </Card>
+
+<script is:inline>
+  // Empêche la navigation vers la fiche quand on clique sur la checkbox
+  document.addEventListener('click', (e) => {
+    const checkboxLabel = e.target.closest('[data-card-checkbox-label]');
+    if (checkboxLabel) {
+      e.preventDefault();
+      e.stopPropagation();
+      const input = checkboxLabel.querySelector('[data-email-checkbox]');
+      if (input) {
+        input.checked = !input.checked;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  });
+</script>
