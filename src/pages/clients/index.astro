@@ -8,31 +8,45 @@ import Pagination from '../../components/ui/Pagination.astro';
 import Icon from '../../components/ui/Icon.astro';
 import ClientCard from '../../components/clients/ClientCard.astro';
 import { fullName } from '../../lib/format';
-import { listClients } from '../../../functions/api/lib/db';
+import { listClients, listDistinctTags } from '../../../functions/api/lib/db';
 
 const DB = Astro.locals.runtime.env.DB;
 
 const q = Astro.url.searchParams.get('q')?.trim() || '';
+const tag = Astro.url.searchParams.get('tag')?.trim() || '';
 const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
 const pageSize = 24;
 
-const result = await listClients(DB, { q, tag: '', page, pageSize });
+const [result, allTags] = await Promise.all([
+  listClients(DB, { q, tag, page, pageSize }),
+  listDistinctTags(DB),
+]);
 const { items: clients, total, totalPages } = result;
 
-// Tous les destinataires de la base (nom + email, dédupliqués par email) —
-// même filtre de recherche que la page, pour que "Tout sélectionner"
-// fonctionne au-delà de la pagination.
+// Tous les destinataires correspondant au filtre courant (recherche + tag),
+// dédupliqués par email — pour que « Tout sélectionner » aille au-delà de la
+// pagination. On compte aussi les fiches sans email, exclues de l'envoi.
 const allClientsResult = total > 0
-  ? await listClients(DB, { q, tag: '', page: 1, pageSize: total })
+  ? await listClients(DB, { q, tag, page: 1, pageSize: total })
   : { items: [] };
 const seenEmails = new Set<string>();
 const allRecipients: { email: string; name: string }[] = [];
+let noEmailCount = 0;
 for (const c of allClientsResult.items) {
   const email = c.email?.trim().toLowerCase();
-  if (!email || seenEmails.has(email)) continue;
+  if (!email) {
+    noEmailCount++;
+    continue;
+  }
+  if (seenEmails.has(email)) continue;
   seenEmails.add(email);
   allRecipients.push({ email, name: fullName(c) });
 }
+
+// Paramètres à conserver dans les liens de pagination
+const carryParams: Record<string, string> = {};
+if (q) carryParams.q = q;
+if (tag) carryParams.tag = tag;
 ---
 
 <Layout title={`Clients — Sharing Fair`}>
@@ -78,6 +92,13 @@ for (const c of allClientsResult.items) {
                 <span id="modal-count" class="text-sm text-ink-500 ml-auto"></span>
               </div>
 
+              {noEmailCount > 0 && (
+                <p class="text-xs text-warning-700 bg-warning-50 border border-warning-100 rounded-lg px-3 py-2">
+                  ⚠️ {noEmailCount} fiche{noEmailCount > 1 ? 's' : ''} sans adresse email
+                  {tag || q ? ' dans ce filtre' : ''} — exclue{noEmailCount > 1 ? 's' : ''} de l'envoi.
+                </p>
+              )}
+
               <!-- Pastilles des destinataires -->
               <div id="recipient-chips" class="max-h-40 overflow-y-auto rounded-lg border border-ink-200 bg-ink-50 p-2 flex flex-wrap gap-1.5 content-start">
                 <p id="chips-empty" class="text-xs text-ink-400 p-2 w-full">
@@ -107,15 +128,44 @@ for (const c of allClientsResult.items) {
                 <Button type="button" variant="ghost" id="modal-close-btn">Fermer</Button>
                 <Button type="button" variant="outline" id="copy-emails">
                   <Icon name="check" size={14} />
-                  Copier les adresses
+                  Copier
                 </Button>
                 <Button type="button" variant="primary" id="open-roundcube" class="flex-1">
                   <Icon name="mail" size={16} />
                   Ouvrir Roundcube
                 </Button>
               </div>
+
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <button type="button" id="toggle-settings" class="text-ink-400 hover:text-ink-700 transition-colors underline underline-offset-2">
+                  ⚙ Configurer l'URL du webmail
+                </button>
+                <button type="button" id="open-mailto" class="text-ink-400 hover:text-ink-700 transition-colors underline underline-offset-2">
+                  Utiliser mon logiciel de mail
+                </button>
+              </div>
+
+              <div id="settings-panel" class="hidden space-y-2 rounded-lg border border-ink-200 bg-ink-50 p-3">
+                <label for="roundcube-url" class="block text-xs font-medium text-ink-700">
+                  URL de votre webmail Roundcube
+                </label>
+                <div class="flex gap-2">
+                  <input
+                    type="url"
+                    id="roundcube-url"
+                    placeholder="https://webmail.mail.ovh.net/"
+                    class="flex-1 h-9 px-3 rounded-lg border border-ink-200 bg-white text-xs text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <Button type="button" variant="outline" size="sm" id="save-roundcube-url">Enregistrer</Button>
+                </div>
+                <p class="text-[11px] text-ink-400">
+                  Enregistrée dans ce navigateur uniquement. Laissez vide pour revenir à l'URL par défaut.
+                </p>
+              </div>
+
               <p class="text-xs text-ink-400">
-                💡 Connectez-vous d'abord à Roundcube dans un autre onglet pour que la composition s'ouvre directement.
+                💡 Astuce : <strong class="text-ink-600">Maj+clic</strong> sur une case sélectionne toute une plage de clients.
+                Connectez-vous d'abord au webmail dans un autre onglet pour que la composition s'ouvre directement.
               </p>
             </div>
           </div>
@@ -126,6 +176,7 @@ for (const c of allClientsResult.items) {
     <!-- Tous les destinataires de la base (pour "Tout sélectionner") -->
     <script type="application/json" id="all-emails-data" set:html={JSON.stringify(allRecipients).replace(/</g, '\\u003c')}></script>
     <form method="GET" action="/clients" class="surface p-3 sm:p-4">
+      {tag && <input type="hidden" name="tag" value={tag} />}
       <div class="flex gap-2">
         <div class="flex-1 relative">
           <Icon name="search" size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
@@ -142,16 +193,48 @@ for (const c of allClientsResult.items) {
           <Icon name="filter" size={16} />
           <span class="hidden sm:inline">Rechercher</span>
         </Button>
-        {q && (
+        {(q || tag) && (
           <Button href="/clients" variant="ghost">
             <Icon name="x" size={16} />
             <span class="sr-only">Réinitialiser</span>
           </Button>
         )}
       </div>
-      {q && (
+
+      {allTags.length > 0 && (
+        <div class="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-ink-100">
+          <span class="text-xs text-ink-500 inline-flex items-center gap-1">
+            <Icon name="tag" size={12} />
+            Filtrer :
+          </span>
+          <a
+            href={q ? `/clients?q=${encodeURIComponent(q)}` : '/clients'}
+            class={`px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset transition-opacity ${
+              tag ? 'bg-white text-ink-500 ring-ink-200 hover:opacity-80' : 'bg-ink-900 text-white ring-ink-900'
+            }`}
+          >
+            Tous
+          </a>
+          {allTags.map((t) => (
+            <a
+              href={`/clients?${new URLSearchParams(q ? { q, tag: t } : { tag: t })}`}
+              class={`px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset transition-opacity ${
+                tag === t
+                  ? 'bg-brand-500 text-white ring-brand-500'
+                  : 'bg-brand-50 text-brand-700 ring-brand-200 hover:opacity-80'
+              }`}
+            >
+              {t}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {(q || tag) && (
         <p class="text-xs text-ink-500 mt-3">
-          {total} résultat{total > 1 ? 's' : ''} pour <strong class="text-ink-900">"{q}"</strong>
+          {total} résultat{total > 1 ? 's' : ''}
+          {q && <> pour <strong class="text-ink-900">"{q}"</strong></>}
+          {tag && <> dans <strong class="text-ink-900">{tag}</strong></>}
         </p>
       )}
     </form>
@@ -159,19 +242,19 @@ for (const c of allClientsResult.items) {
     <!-- Results -->
     {clients.length === 0 ? (
       <EmptyState
-        title={q ? 'Aucun résultat' : 'Aucun client pour l\'instant'}
-        description={q
-          ? `Aucune fiche ne correspond à "${q}". Essayez un autre terme.`
+        title={q || tag ? 'Aucun résultat' : 'Aucun client pour l\'instant'}
+        description={q || tag
+          ? `Aucune fiche ne correspond à ce filtre. Essayez un autre terme ou un autre tag.`
           : 'Créez votre première fiche client pour commencer.'}
       >
         <Icon slot="icon" name="users" size={24} />
-        {!q && (
+        {!q && !tag && (
           <Button slot="actions" href="/clients/nouveau" variant="primary">
             <Icon name="plus" size={16} />
             Créer le premier client
           </Button>
         )}
-        {q && (
+        {(q || tag) && (
           <Button slot="actions" href="/clients" variant="outline">
             Réinitialiser
           </Button>
@@ -187,7 +270,7 @@ for (const c of allClientsResult.items) {
           page={page}
           totalPages={totalPages}
           baseUrl="/clients"
-          searchParams={q ? { q } : {}}
+          searchParams={carryParams}
         />
 
         <!-- Barre flottante de sélection -->
@@ -222,10 +305,19 @@ for (const c of allClientsResult.items) {
 // ============================================================
 // Configuration — adaptez si votre webmail OVH a une autre URL
 // ============================================================
-const ROUNDCUBE_BASE = 'https://webmail.mail.ovh.net/';
+const DEFAULT_ROUNDCUBE = 'https://webmail.mail.ovh.net/';
+const URL_KEY = 'sf-roundcube-url';
 const BCC_LIMIT = 40;   // adresses max pré-remplies dans l'URL Roundcube (le reste passe par la copie)
 const BODY_LIMIT = 300; // corps de message max pré-rempli dans l'URL (sinon → presse-papier)
 const STORAGE_KEY = 'sf-mail-selection';
+
+function roundcubeBase() {
+  try {
+    return localStorage.getItem(URL_KEY) || DEFAULT_ROUNDCUBE;
+  } catch {
+    return DEFAULT_ROUNDCUBE;
+  }
+}
 
 // ============================================================
 // Éléments du DOM
@@ -367,17 +459,46 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
 });
 
+// Maj+clic : sélection par plage. On capture l'état de la touche avant que le
+// gestionnaire de la carte ne bascule la case (phase de capture).
+let shiftPressed = false;
+let lastToggledIndex = null;
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-card-checkbox-label]')) shiftPressed = e.shiftKey;
+}, true);
+
 // Clic sur une case d'une carte client → met à jour la sélection
 document.addEventListener('change', (e) => {
-  if (e.target.matches('[data-email-checkbox]')) {
-    if (e.target.checked) {
-      selected.set(e.target.value, e.target.dataset.name || namesByEmail.get(e.target.value) || e.target.value);
+  if (!e.target.matches('[data-email-checkbox]')) return;
+
+  const boxes = Array.from(document.querySelectorAll('[data-email-checkbox]'));
+  const idx = boxes.indexOf(e.target);
+  const checked = e.target.checked;
+
+  const applyBox = (cb) => {
+    if (cb.checked) {
+      selected.set(cb.value, cb.dataset.name || namesByEmail.get(cb.value) || cb.value);
     } else {
-      selected.delete(e.target.value);
+      selected.delete(cb.value);
     }
-    saveSelection();
-    refreshUI();
+  };
+
+  if (shiftPressed && lastToggledIndex !== null && idx !== -1) {
+    // Applique le même état à toute la plage depuis la dernière case cliquée
+    const [from, to] = [Math.min(lastToggledIndex, idx), Math.max(lastToggledIndex, idx)];
+    for (let i = from; i <= to; i++) {
+      boxes[i].checked = checked;
+      applyBox(boxes[i]);
+    }
+  } else {
+    applyBox(e.target);
   }
+
+  lastToggledIndex = idx;
+  shiftPressed = false;
+  saveSelection();
+  refreshUI();
 });
 
 // « Sélectionner la page » : coche uniquement les clients visibles
@@ -438,7 +559,7 @@ document.getElementById('open-roundcube').addEventListener('click', async () => 
   // Copie systématique des adresses (secours si le pré-remplissage échoue côté Roundcube)
   try { await navigator.clipboard.writeText(emails.join(', ')); } catch { /* non bloquant */ }
 
-  let url = ROUNDCUBE_BASE + '?_task=mail&_action=compose&_bcc=' + encodeURIComponent(shown.join(', '));
+  let url = roundcubeBase() + '?_task=mail&_action=compose&_bcc=' + encodeURIComponent(shown.join(', '));
   if (subject) url += '&_subject=' + encodeURIComponent(subject);
   const bodyInUrl = body && body.length <= BODY_LIMIT;
   if (bodyInUrl) url += '&_body=' + encodeURIComponent(body);
@@ -452,6 +573,54 @@ document.getElementById('open-roundcube').addEventListener('click', async () => 
     `${emails.length} adresse(s) envoyée(s) vers Roundcube ✅` + (notes.length ? ` — ${notes.join(' ; ')}.` : ''),
     true,
   );
+});
+
+// Panneau de configuration de l'URL du webmail
+const settingsPanel = document.getElementById('settings-panel');
+const urlInput = document.getElementById('roundcube-url');
+
+document.getElementById('toggle-settings').addEventListener('click', () => {
+  const hidden = settingsPanel.classList.toggle('hidden');
+  if (!hidden) {
+    try { urlInput.value = localStorage.getItem(URL_KEY) || ''; } catch { /* non bloquant */ }
+    urlInput.focus();
+  }
+});
+
+document.getElementById('save-roundcube-url').addEventListener('click', () => {
+  const value = urlInput.value.trim();
+  try {
+    if (value) {
+      localStorage.setItem(URL_KEY, value.endsWith('/') ? value : value + '/');
+      showStatus('URL du webmail enregistrée ✅', true);
+    } else {
+      localStorage.removeItem(URL_KEY);
+      showStatus('URL réinitialisée par défaut ✅', true);
+    }
+    settingsPanel.classList.add('hidden');
+  } catch {
+    showStatus("Impossible d'enregistrer l'URL dans ce navigateur.", false);
+  }
+});
+
+// Secours : ouvre le logiciel de mail par défaut (Outlook, Thunderbird, Mail…)
+document.getElementById('open-mailto').addEventListener('click', () => {
+  const emails = selectedEmails();
+  if (!emails.length) { showStatus('Sélectionnez au moins une adresse.', false); return; }
+
+  const subject = subjectInput.value.trim();
+  const body = bodyInput.value.trim();
+
+  const params = [];
+  if (subject) params.push('subject=' + encodeURIComponent(subject));
+  if (body) params.push('body=' + encodeURIComponent(body));
+
+  // Les destinataires passent en Cci pour ne pas exposer les adresses entre elles
+  const bcc = emails.slice(0, BCC_LIMIT).join(',');
+  params.unshift('bcc=' + encodeURIComponent(bcc));
+
+  window.location.href = 'mailto:?' + params.join('&');
+  showStatus('Ouverture de votre logiciel de mail…', true);
 });
 
 // Restauration de la sélection mémorisée (ex. retour après recherche/changement de page)
