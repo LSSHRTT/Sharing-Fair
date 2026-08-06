@@ -7,6 +7,7 @@ import EmptyState from '../../components/ui/EmptyState.astro';
 import Pagination from '../../components/ui/Pagination.astro';
 import Icon from '../../components/ui/Icon.astro';
 import ClientCard from '../../components/clients/ClientCard.astro';
+import { fullName } from '../../lib/format';
 import { listClients } from '../../../functions/api/lib/db';
 
 const DB = Astro.locals.runtime.env.DB;
@@ -18,16 +19,20 @@ const pageSize = 24;
 const result = await listClients(DB, { q, tag: '', page, pageSize });
 const { items: clients, total, totalPages } = result;
 
-// Tous les emails de la base (dédupliqués) — même filtre de recherche que la page,
-// pour que "Tout sélectionner" fonctionne au-delà de la pagination.
-const allEmailsResult = total > 0
+// Tous les destinataires de la base (nom + email, dédupliqués par email) —
+// même filtre de recherche que la page, pour que "Tout sélectionner"
+// fonctionne au-delà de la pagination.
+const allClientsResult = total > 0
   ? await listClients(DB, { q, tag: '', page: 1, pageSize: total })
   : { items: [] };
-const allEmails = [...new Set(
-  allEmailsResult.items
-    .map((c) => c.email?.trim().toLowerCase())
-    .filter((e): e is string => Boolean(e)),
-)];
+const seenEmails = new Set<string>();
+const allRecipients: { email: string; name: string }[] = [];
+for (const c of allClientsResult.items) {
+  const email = c.email?.trim().toLowerCase();
+  if (!email || seenEmails.has(email)) continue;
+  seenEmails.add(email);
+  allRecipients.push({ email, name: fullName(c) });
+}
 ---
 
 <Layout title={`Clients — Sharing Fair`}>
@@ -60,19 +65,41 @@ const allEmails = [...new Set(
                 </p>
               </div>
 
-              <div class="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" id="modal-select-all">Tout sélectionner</Button>
-                <Button type="button" variant="outline" size="sm" id="modal-select-none">Tout désélectionner</Button>
+              <div class="flex items-center gap-2 flex-wrap">
+                <Button type="button" variant="outline" size="sm" id="modal-select-page">
+                  Sélectionner la page
+                </Button>
+                <Button type="button" variant="outline" size="sm" id="modal-select-all">
+                  Tout sélectionner
+                </Button>
+                <Button type="button" variant="ghost" size="sm" id="modal-select-none">
+                  Effacer
+                </Button>
                 <span id="modal-count" class="text-sm text-ink-500 ml-auto"></span>
               </div>
 
-              <textarea
-                id="bcc-list"
-                rows="5"
-                readonly
-                placeholder="Aucune adresse sélectionnée — cochez des clients sur la page ou utilisez « Tout sélectionner »."
-                class="w-full rounded-lg border border-ink-200 bg-ink-50 p-3 text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-              ></textarea>
+              <!-- Pastilles des destinataires -->
+              <div id="recipient-chips" class="max-h-40 overflow-y-auto rounded-lg border border-ink-200 bg-ink-50 p-2 flex flex-wrap gap-1.5 content-start">
+                <p id="chips-empty" class="text-xs text-ink-400 p-2 w-full">
+                  Aucun destinataire — cochez des clients sur la page ou utilisez les boutons ci-dessus.
+                </p>
+              </div>
+
+              <!-- Objet + message -->
+              <div class="space-y-2">
+                <input
+                  type="text"
+                  id="mail-subject"
+                  placeholder="Objet du mail (optionnel)"
+                  class="w-full h-10 px-3 rounded-lg border border-ink-200 bg-white text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <textarea
+                  id="mail-body"
+                  rows="3"
+                  placeholder="Message (optionnel) — pré-rempli dans Roundcube si court, sinon copié dans le presse-papier."
+                  class="w-full rounded-lg border border-ink-200 bg-white p-3 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                ></textarea>
+              </div>
 
               <p id="mail-status" class="text-sm font-medium hidden"></p>
 
@@ -96,8 +123,8 @@ const allEmails = [...new Set(
       </div>
     </div>
 
-    <!-- Tous les emails de la base (pour "Tout sélectionner") -->
-    <script type="application/json" id="all-emails-data" set:html={JSON.stringify(allEmails)}></script>
+    <!-- Tous les destinataires de la base (pour "Tout sélectionner") -->
+    <script type="application/json" id="all-emails-data" set:html={JSON.stringify(allRecipients).replace(/</g, '\\u003c')}></script>
     <form method="GET" action="/clients" class="surface p-3 sm:p-4">
       <div class="flex gap-2">
         <div class="flex-1 relative">
@@ -196,46 +223,111 @@ const allEmails = [...new Set(
 // Configuration — adaptez si votre webmail OVH a une autre URL
 // ============================================================
 const ROUNDCUBE_BASE = 'https://webmail.mail.ovh.net/';
-const BCC_LIMIT = 40; // adresses max pré-remplies dans l'URL Roundcube (le reste passe par la copie)
+const BCC_LIMIT = 40;   // adresses max pré-remplies dans l'URL Roundcube (le reste passe par la copie)
+const BODY_LIMIT = 300; // corps de message max pré-rempli dans l'URL (sinon → presse-papier)
+const STORAGE_KEY = 'sf-mail-selection';
 
 // ============================================================
 // Éléments du DOM
 // ============================================================
 const modal = document.getElementById('email-modal');
-const bccList = document.getElementById('bcc-list');
+const chipsContainer = document.getElementById('recipient-chips');
+const chipsEmpty = document.getElementById('chips-empty');
 const selCount = document.getElementById('sel-count');
 const modalCount = document.getElementById('modal-count');
 const statusEl = document.getElementById('mail-status');
 const selectionBar = document.getElementById('selection-bar');
+const subjectInput = document.getElementById('mail-subject');
+const bodyInput = document.getElementById('mail-body');
 
-const allEmails = JSON.parse(document.getElementById('all-emails-data').textContent);
+const allRecipients = JSON.parse(document.getElementById('all-emails-data').textContent);
+const namesByEmail = new Map(allRecipients.map(r => [r.email, r.name]));
 
-// La sélection = cases cochées de la page ∪ emails ajoutés via « Tout sélectionner »
-const extraEmails = new Set();
+// ============================================================
+// État — la sélection vit dans `selected` (email → nom) et est
+// persistée en session (survit aux changements de page/recherche).
+// ============================================================
+const selected = new Map();
 
-function pageCheckedEmails() {
-  return Array.from(document.querySelectorAll('[data-email-checkbox]:checked')).map(cb => cb.value);
+try {
+  const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]');
+  if (Array.isArray(saved)) {
+    for (const r of saved) {
+      if (r && typeof r.email === 'string') selected.set(r.email, r.name || r.email);
+    }
+  }
+} catch { /* sessionStorage indisponible : on continue sans persistance */ }
+
+function saveSelection() {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...selected.entries()].map(([email, name]) => ({ email, name }))));
+  } catch { /* non bloquant */ }
 }
 
 function selectedEmails() {
-  return [...new Set([...pageCheckedEmails(), ...extraEmails])];
+  return [...selected.keys()];
+}
+
+function pageEmails() {
+  return Array.from(document.querySelectorAll('[data-email-checkbox]')).map(cb => cb.value);
+}
+
+// Synchronise les cases cochées de la page avec l'état
+function syncCheckboxes() {
+  document.querySelectorAll('[data-email-checkbox]').forEach(cb => {
+    cb.checked = selected.has(cb.value);
+  });
 }
 
 // ============================================================
 // UI helpers
 // ============================================================
 function updateFooterBar() {
-  const n = selectedEmails().length;
+  const n = selected.size;
   selCount.textContent = n;
   selectionBar.classList.toggle('hidden', n === 0);
   selectionBar.classList.toggle('flex', n > 0);
 }
 
-function refreshModal() {
-  const emails = selectedEmails();
-  bccList.value = emails.join(', ');
-  modalCount.textContent = emails.length + (emails.length > 1 ? ' adresses' : ' adresse');
+function renderChips() {
+  chipsContainer.querySelectorAll('[data-chip]').forEach(el => el.remove());
+  const entries = [...selected.entries()].sort((a, b) => a[1].localeCompare(b[1], 'fr'));
+
+  chipsEmpty.classList.toggle('hidden', entries.length > 0);
+
+  for (const [email, name] of entries) {
+    const chip = document.createElement('span');
+    chip.setAttribute('data-chip', '');
+    chip.className = 'inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-white border border-ink-200 text-xs text-ink-700 shadow-xs';
+
+    const label = document.createElement('span');
+    label.className = 'truncate max-w-[180px]';
+    label.textContent = name !== email ? `${name} · ${email}` : email;
+    label.title = email;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'w-5 h-5 flex items-center justify-center rounded-full text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label', `Retirer ${name}`);
+    btn.addEventListener('click', () => {
+      selected.delete(email);
+      saveSelection();
+      syncCheckboxes();
+      refreshUI();
+    });
+
+    chip.appendChild(label);
+    chip.appendChild(btn);
+    chipsContainer.appendChild(chip);
+  }
+}
+
+function refreshUI() {
+  const n = selected.size;
+  modalCount.textContent = n + (n > 1 ? ' destinataires' : ' destinataire');
   statusEl.classList.add('hidden');
+  renderChips();
   updateFooterBar();
 }
 
@@ -245,7 +337,7 @@ function showStatus(message, ok) {
 }
 
 function openModal() {
-  refreshModal();
+  refreshUI();
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -263,9 +355,10 @@ document.getElementById('toolbar-open-modal').addEventListener('click', openModa
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 
 document.getElementById('toolbar-clear').addEventListener('click', () => {
-  document.querySelectorAll('[data-email-checkbox]:checked').forEach(cb => (cb.checked = false));
-  extraEmails.clear();
-  updateFooterBar();
+  selected.clear();
+  saveSelection();
+  syncCheckboxes();
+  refreshUI();
 });
 
 modal.querySelectorAll('[data-modal-close]').forEach(el => el.addEventListener('click', closeModal));
@@ -274,23 +367,43 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
 });
 
-// Les cases des cartes client mettent à jour la barre flottante
+// Clic sur une case d'une carte client → met à jour la sélection
 document.addEventListener('change', (e) => {
-  if (e.target.matches('[data-email-checkbox]')) updateFooterBar();
+  if (e.target.matches('[data-email-checkbox]')) {
+    if (e.target.checked) {
+      selected.set(e.target.value, e.target.dataset.name || namesByEmail.get(e.target.value) || e.target.value);
+    } else {
+      selected.delete(e.target.value);
+    }
+    saveSelection();
+    refreshUI();
+  }
 });
 
-// « Tout sélectionner » : ajoute TOUS les emails de la base (au-delà de la page affichée)
+// « Sélectionner la page » : coche uniquement les clients visibles
+document.getElementById('modal-select-page').addEventListener('click', () => {
+  document.querySelectorAll('[data-email-checkbox]').forEach(cb => {
+    selected.set(cb.value, cb.dataset.name || cb.value);
+  });
+  saveSelection();
+  syncCheckboxes();
+  refreshUI();
+});
+
+// « Tout sélectionner » : TOUS les emails de la base (au-delà de la page affichée)
 document.getElementById('modal-select-all').addEventListener('click', () => {
-  extraEmails.clear();
-  allEmails.forEach(e => extraEmails.add(e));
-  document.querySelectorAll('[data-email-checkbox]').forEach(cb => (cb.checked = true));
-  refreshModal();
+  allRecipients.forEach(r => selected.set(r.email, r.name));
+  saveSelection();
+  syncCheckboxes();
+  refreshUI();
 });
 
+// « Effacer » : vide toute la sélection
 document.getElementById('modal-select-none').addEventListener('click', () => {
-  extraEmails.clear();
-  document.querySelectorAll('[data-email-checkbox]:checked').forEach(cb => (cb.checked = false));
-  refreshModal();
+  selected.clear();
+  saveSelection();
+  syncCheckboxes();
+  refreshUI();
 });
 
 // Copie dans le presse-papier
@@ -301,31 +414,48 @@ document.getElementById('copy-emails').addEventListener('click', async () => {
     await navigator.clipboard.writeText(emails.join(', '));
     showStatus(emails.length + ' adresse(s) copiée(s) dans le presse-papier ✅', true);
   } catch {
-    bccList.select();
+    const tmp = document.createElement('textarea');
+    tmp.value = emails.join(', ');
+    document.body.appendChild(tmp);
+    tmp.select();
     document.execCommand('copy');
+    tmp.remove();
     showStatus(emails.length + ' adresse(s) copiée(s) ✅', true);
   }
 });
 
-// Ouverture de Roundcube avec BCC pré-rempli
+// Ouverture de Roundcube : Cci + objet + corps pré-remplis au mieux
 document.getElementById('open-roundcube').addEventListener('click', async () => {
   const emails = selectedEmails();
   if (!emails.length) { showStatus('Sélectionnez au moins une adresse.', false); return; }
 
-  const shown = emails.slice(0, BCC_LIMIT);
-  const hidden = emails.slice(BCC_LIMIT);
+  const subject = subjectInput.value.trim();
+  const body = bodyInput.value.trim();
 
-  // Copie systématique (secours si le pré-remplissage échoue côté Roundcube)
+  const shown = emails.slice(0, BCC_LIMIT);
+  const overflow = emails.slice(BCC_LIMIT);
+
+  // Copie systématique des adresses (secours si le pré-remplissage échoue côté Roundcube)
   try { await navigator.clipboard.writeText(emails.join(', ')); } catch { /* non bloquant */ }
 
-  const url = ROUNDCUBE_BASE + '?_task=mail&_action=compose&_bcc=' + encodeURIComponent(shown.join(', '));
+  let url = ROUNDCUBE_BASE + '?_task=mail&_action=compose&_bcc=' + encodeURIComponent(shown.join(', '));
+  if (subject) url += '&_subject=' + encodeURIComponent(subject);
+  const bodyInUrl = body && body.length <= BODY_LIMIT;
+  if (bodyInUrl) url += '&_body=' + encodeURIComponent(body);
+
   window.open(url, '_blank', 'noopener');
 
-  if (hidden.length) {
-    showStatus(BCC_LIMIT + ' adresses pré-remplies dans Roundcube ; les ' + hidden.length + ' restantes sont dans votre presse-papier — collez-les dans le champ « Cci ».', true);
-  } else {
-    showStatus(emails.length + ' adresse(s) envoyée(s) vers Roundcube (et copiées dans le presse-papier) ✅', true);
-  }
+  const notes = [];
+  if (overflow.length) notes.push(`${overflow.length} adresse(s) dans le presse-papier — collez-les dans « Cci »`);
+  if (body && !bodyInUrl) notes.push('message trop long pour le lien — copiez-le depuis la modale');
+  showStatus(
+    `${emails.length} adresse(s) envoyée(s) vers Roundcube ✅` + (notes.length ? ` — ${notes.join(' ; ')}.` : ''),
+    true,
+  );
 });
+
+// Restauration de la sélection mémorisée (ex. retour après recherche/changement de page)
+syncCheckboxes();
+refreshUI();
   </script>
 </Layout>
