@@ -8,6 +8,7 @@ import Field from '../../components/ui/Field.astro';
 import Icon from '../../components/ui/Icon.astro';
 import ToastAnimated from '../../components/ui/ToastAnimated.astro';
 import { createVolunteer, listVolunteers } from '../../lib/volunteers';
+import { notify } from '../../lib/notifications';
 import { formatDate } from '../../lib/format';
 
 const DB = Astro.locals.runtime.env.DB;
@@ -46,6 +47,13 @@ if (Astro.request.method === 'POST') {
     if (!result.ok) {
       errorKey = 'doublon';
     } else {
+      await notify(
+        DB,
+        me.id,
+        'volunteer_added',
+        `${me.first_name} ${me.last_name} a ajouté ${firstName} ${lastName} à l'équipe`,
+        '/equipe',
+      );
       return Astro.redirect('/equipe?ok=ajoute', 303);
     }
   }

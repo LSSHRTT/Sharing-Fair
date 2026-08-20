@@ -1,6 +1,8 @@
 ---
 import Icon from './ui/Icon.astro';
 import InstallButton from './pwa/InstallButton.astro';
+import { countUnread } from '../lib/notifications';
+import { canAccess } from '../lib/volunteers';
 
 const path = Astro.url.pathname;
 
@@ -14,8 +16,13 @@ else if (path.startsWith('/calendrier/evenement')) title = 'Événement';
 else if (path.startsWith('/calendrier')) title = 'Calendrier';
 else if (path.startsWith('/equipe')) title = 'Équipe';
 else if (path.startsWith('/profil')) title = 'Mon profil';
+else if (path.startsWith('/notifications')) title = 'Notifications';
 
 const q = Astro.url.searchParams.get('q') ?? '';
+
+const me = Astro.locals.volunteer;
+const unread = me ? await countUnread(Astro.locals.runtime.env.DB, me.id) : 0;
+const canClients = me ? canAccess(me, 'clients') : false;
 ---
 
 <header class="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-ink-200">
@@ -43,15 +50,30 @@ const q = Astro.url.searchParams.get('q') ?? '';
 
     <!-- Right actions -->
     <div class="ml-auto lg:ml-0 flex items-center gap-2">
-      <InstallButton variant="topbar" />
+      <!-- Cloche de notifications -->
       <a
-        href="/clients/nouveau"
-        class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 hover:shadow-md transition-all"
+        href="/notifications"
+        class="relative inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+        aria-label={unread > 0 ? `Notifications : ${unread} non lue${unread > 1 ? 's' : ''}` : 'Notifications'}
       >
-        <Icon name="plus" size={16} />
-        <span class="hidden sm:inline">Nouveau client</span>
-        <span class="sm:hidden">Ajouter</span>
+        <Icon name="bell" size={19} />
+        {unread > 0 && (
+          <span class="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm ring-2 ring-white">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
       </a>
+      <InstallButton variant="topbar" />
+      {canClients && (
+        <a
+          href="/clients/nouveau"
+          class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 hover:shadow-md transition-all"
+        >
+          <Icon name="plus" size={16} />
+          <span class="hidden sm:inline">Nouveau client</span>
+          <span class="sm:hidden">Ajouter</span>
+        </a>
+      )}
     </div>
   </div>
 </header>

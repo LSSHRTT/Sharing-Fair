@@ -4,6 +4,7 @@ import PageHeader from '../../../components/ui/PageHeader.astro';
 import ToastAnimated from '../../../components/ui/ToastAnimated.astro';
 import EventForm from '../../../components/events/EventForm.astro';
 import { createEvent, isValidIsoDate } from '../../../lib/events';
+import { notify } from '../../../lib/notifications';
 
 const DB = Astro.locals.runtime.env.DB;
 
@@ -40,6 +41,14 @@ if (Astro.request.method === 'POST') {
       contact,
       notes,
     });
+    const actor = Astro.locals.volunteer!;
+    await notify(
+      DB,
+      actor.id,
+      'event_added',
+      `${actor.first_name} ${actor.last_name} a ajouté l'événement « ${title} »`,
+      `/calendrier/${startDate}?m=${startDate.slice(0, 7)}`,
+    );
     return Astro.redirect(`/calendrier/${startDate}?m=${startDate.slice(0, 7)}&ok=event`, 303);
   }
 }

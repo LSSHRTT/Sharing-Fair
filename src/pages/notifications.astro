@@ -1,0 +1,67 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/ui/PageHeader.astro';
+import Icon from '../components/ui/Icon.astro';
+import EmptyState from '../components/ui/EmptyState.astro';
+import { listRecentNotifications, markAllRead } from '../lib/notifications';
+import { formatRelative } from '../lib/format';
+
+const DB = Astro.locals.runtime.env.DB;
+const me = Astro.locals.volunteer!;
+
+const items = await listRecentNotifications(DB, 30);
+// La page joue le rôle de « tout marquer comme lu » (le compteur repart à 0).
+await markAllRead(DB, me.id);
+
+const TYPE_META: Record<string, { icon: 'users' | 'calendar'; bg: string; text: string }> = {
+  volunteer_added: { icon: 'users', bg: 'bg-brand-100', text: 'text-brand-700' },
+  event_added: { icon: 'calendar', bg: 'bg-accent-100', text: 'text-accent-700' },
+};
+---
+
+<Layout title="Notifications — Sharing Fair">
+  <div class="max-w-2xl mx-auto space-y-6">
+    <PageHeader
+      title="Notifications"
+      description="Les ajouts récents de l'équipe : nouveaux bénévoles et événements du calendrier."
+    />
+
+    {items.length === 0 ? (
+      <EmptyState
+        title="Aucune notification"
+        description="Les ajouts de bénévoles et d'événements apparaîtront ici."
+      >
+        <Icon slot="icon" name="bell" size={24} />
+      </EmptyState>
+    ) : (
+      <ul class="surface overflow-hidden divide-y divide-ink-100 animate-fade-in">
+        {items.map((n, i) => {
+          const meta = TYPE_META[n.type] ?? TYPE_META.event_added;
+          const row = (
+            <>
+              <span class={`w-10 h-10 rounded-xl ${meta.bg} ${meta.text} flex items-center justify-center shrink-0`}>
+                <Icon name={meta.icon} size={18} />
+              </span>
+              <span class="flex-1 min-w-0">
+                <span class="block text-sm text-ink-900 leading-snug">{n.label}</span>
+                <span class="block text-xs text-ink-400 mt-1">{formatRelative(n.created_at)}</span>
+              </span>
+              {n.href && <Icon name="chevron-right" size={15} class="self-center text-ink-300 shrink-0" />}
+            </>
+          );
+          return (
+            <li class={i < 5 ? 'animate-slide-up' : ''} style={i < 5 ? `animation-delay: ${i * 0.04}s` : ''}>
+              {n.href ? (
+                <a href={n.href} class="flex items-start gap-3 px-4 sm:px-5 py-3.5 hover:bg-brand-50/50 transition-colors">
+                  {row}
+                </a>
+              ) : (
+                <div class="flex items-start gap-3 px-4 sm:px-5 py-3.5">{row}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </div>
+</Layout>
