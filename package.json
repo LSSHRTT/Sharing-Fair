@@ -1,7 +1,7 @@
 {
   "name": "sharing-fair",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "astro dev",
@@ -12,6 +12,8 @@
     "db:migrate:local": "wrangler d1 migrations apply sharing_fair_db --local",
     "db:migrate:prod": "wrangler d1 migrations apply sharing_fair_db --remote",
     "db:seed:local": "wrangler d1 execute sharing_fair_db --local --file=scripts/seed.sql",
+    "events:seed:local": "wrangler d1 execute sharing_fair_db --local --file=scripts/events-ordre-du-jour.sql",
+    "events:seed:prod": "wrangler d1 execute sharing_fair_db --remote --file=scripts/events-ordre-du-jour.sql",
     "benevole:add": "node scripts/add-volunteer.mjs"
   },
   "dependencies": {

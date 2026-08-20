@@ -9,6 +9,29 @@ import PwaInstall from '../components/pwa/PwaInstall.astro';
 import { constantTimeEqual, createSessionToken, sessionCookieName, sessionCookieMaxAge } from '../lib/auth';
 import { findVolunteerForLogin } from '../lib/volunteers';
 
+/**
+ * La date de naissance fait office de mot de passe : saisie masquée, plusieurs
+ * formats acceptés — JJ/MM/AAAA, JJ-MM-AAAA, JJMMAAAA ou AAAA-MM-JJ (interne).
+ * Retourne la date normalisée AAAA-MM-JJ, ou null si invalide (ex. 31/02/1990).
+ */
+function parseBirthDate(raw: string): string | null {
+  const s = raw.trim();
+  let y: string, m: string, d: string;
+  let match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (match) {
+    [, y, m, d] = match;
+  } else {
+    match =
+      /^(\d{2})[/\-. ](\d{2})[/\-. ](\d{4})$/.exec(s) ?? /^(\d{2})(\d{2})(\d{4})$/.exec(s);
+    if (!match) return null;
+    [, d, m, y] = match;
+  }
+  const iso = `${y}-${m}-${d}`;
+  const dt = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime()) || dt.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
+}
+
 const env = Astro.locals.runtime.env;
 let error: string | null = null;
 const nextParam = new URL(Astro.request.url).searchParams.get('next') || '/';
@@ -18,25 +41,26 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const firstName = String(form.get('first_name') ?? '');
   const lastName = String(form.get('last_name') ?? '');
-  const birthDate = String(form.get('birth_date') ?? '');
+  const birthDate = parseBirthDate(String(form.get('birth_date') ?? ''));
+  const remember = form.get('remember') === 'on';
   const submittedNext = String(form.get('next') ?? '/');
   const target = submittedNext.startsWith('/') && !submittedNext.startsWith('//') ? submittedNext : '/';
 
   let volunteer = null;
-  // Format de date strict (champ <input type="date">) avant toute requête.
-  if (firstName.trim() && lastName.trim() && /^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+  if (firstName.trim() && lastName.trim() && birthDate) {
     volunteer = await findVolunteerForLogin(env.DB, firstName, lastName);
   }
 
-  if (volunteer && constantTimeEqual(volunteer.birth_date, birthDate)) {
+  if (volunteer && birthDate && constantTimeEqual(volunteer.birth_date, birthDate)) {
     const token = await createSessionToken(env.AUTH_SECRET, volunteer.id);
-    Astro.cookies.set(sessionCookieName(), token, {
+    const cookieOptions = {
       path: '/',
       httpOnly: true,
       secure: true,
-      sameSite: 'lax',
-      maxAge: sessionCookieMaxAge(),
-    });
+      sameSite: 'lax' as const,
+      ...(sessionCookieMaxAge(remember) ? { maxAge: sessionCookieMaxAge(remember)! } : {}),
+    };
+    Astro.cookies.set(sessionCookieName(), token, cookieOptions);
     return Astro.redirect(target, 302);
   }
   error = 'Identifiants incorrects. Vérifiez votre prénom, votre nom et votre date de naissance.';
@@ -114,17 +138,43 @@ if (Astro.request.method === 'POST') {
           </Field>
 
           <Field label="Date de naissance" required for="birth_date">
-            <Input
-              id="birth_date"
-              name="birth_date"
-              type="date"
-              required
-              autocomplete="bday"
-              min="1900-01-01"
-              max="2015-12-31"
-            />
-            <p class="text-xs text-ink-400 mt-1.5">Votre date de naissance fait office de mot de passe.</p>
+            <div class="relative">
+              <Input
+                id="birth_date"
+                name="birth_date"
+                type="password"
+                required
+                autocomplete="off"
+                inputmode="numeric"
+                maxlength={10}
+                placeholder="JJ / MM / AAAA"
+                hasError={error !== null}
+                class="pr-10 tracking-wider"
+              />
+              <button
+                type="button"
+                id="toggle-birth"
+                class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 rounded-md text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors"
+                aria-label="Afficher ou masquer la date de naissance"
+              >
+                <svg id="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg id="eye-closed" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="M2 2l20 20"/></svg>
+              </button>
+            </div>
+            <p class="text-xs text-ink-400 mt-1.5">
+              Votre date de naissance fait office de mot de passe — saisie masquée.
+            </p>
           </Field>
+
+          <label class="flex items-center gap-2.5 cursor-pointer select-none min-h-[44px] -mx-1 px-1 rounded-lg hover:bg-ink-50 transition-colors">
+            <input
+              type="checkbox"
+              name="remember"
+              checked
+              class="w-4 h-4 rounded border-ink-300 text-brand-600 accent-brand-600 focus:ring-brand-500"
+            />
+            <span class="text-sm text-ink-700">Rester connecté sur cet appareil</span>
+          </label>
 
           {error && (
             <p class="text-sm text-danger-700 bg-danger-50 border border-danger-200 rounded-lg px-3 py-2.5 flex items-start gap-2">
@@ -153,6 +203,34 @@ if (Astro.request.method === 'POST') {
         const input = document.getElementById('first_name');
         if (input) input.focus();
       });
+
+      // Œil : afficher/masquer la date de naissance (sa saisie est masquée).
+      (() => {
+        const btn = document.getElementById('toggle-birth');
+        const field = document.getElementById('birth_date');
+        const eyeOpen = document.getElementById('eye-open');
+        const eyeClosed = document.getElementById('eye-closed');
+        if (!btn || !field || !eyeOpen || !eyeClosed) return;
+        btn.addEventListener('click', () => {
+          const showing = field.type === 'text';
+          field.type = showing ? 'password' : 'text';
+          eyeOpen.classList.toggle('hidden', !showing);
+          eyeClosed.classList.toggle('hidden', showing);
+          field.focus();
+        });
+      })();
+
+      // Saisie guidée JJ/MM/AAAA : ajoute les '/' automatiquement.
+      (() => {
+        const field = document.getElementById('birth_date');
+        if (!field) return;
+        field.addEventListener('input', () => {
+          const digits = field.value.replace(/\D/g, '').slice(0, 8);
+          const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean);
+          const formatted = parts.join('/');
+          if (formatted !== field.value) field.value = formatted;
+        });
+      })();
     </script>
   </body>
 </html>

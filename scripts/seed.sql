@@ -39,3 +39,7 @@ INSERT INTO presences (volunteer_id, date, status, updated_at) VALUES
   (1, '2026-08-21', 'present', '2026-08-19T18:00:00Z'),
   (3, '2026-08-21', 'absent',  '2026-08-19T18:10:00Z'),
   (2, '2026-08-22', 'present', '2026-08-19T18:05:00Z');
+
+-- Les événements sont remis à zéro ; pour les recharger :
+--   npm run events:seed:local
+DELETE FROM events;

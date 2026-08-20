@@ -1,0 +1,99 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import ToastAnimated from '../../../components/ui/ToastAnimated.astro';
+import Button from '../../../components/ui/Button.astro';
+import Icon from '../../../components/ui/Icon.astro';
+import EventForm from '../../../components/events/EventForm.astro';
+import { getEvent, updateEvent, isValidIsoDate } from '../../../lib/events';
+
+const DB = Astro.locals.runtime.env.DB;
+const id = Number(Astro.params.id);
+if (!Number.isInteger(id) || id <= 0) {
+  return Astro.redirect('/calendrier', 302);
+}
+
+const event = await getEvent(DB, id);
+if (!event) {
+  return Astro.redirect('/calendrier', 302);
+}
+
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const title = String(form.get('title') ?? '').trim();
+  const startDate = String(form.get('start_date') ?? '').trim();
+  let endDate = String(form.get('end_date') ?? '').trim();
+  if (!endDate) endDate = startDate;
+  const hours = String(form.get('hours') ?? '').trim() || null;
+  const volunteersText = String(form.get('volunteers_text') ?? '').trim() || null;
+  const contact = String(form.get('contact') ?? '').trim() || null;
+  const notes = String(form.get('notes') ?? '').trim() || null;
+
+  if (!title || title.length > 150) {
+    error = "Le titre est requis (150 caractères maximum).";
+  } else if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate) || endDate < startDate) {
+    error = 'Dates invalides : la date de fin doit être postérieure ou égale à la date de début.';
+  } else {
+    await updateEvent(DB, id, {
+      title,
+      start_date: startDate,
+      end_date: endDate,
+      hours,
+      volunteers_text: volunteersText,
+      contact,
+      notes,
+    });
+    return Astro.redirect(`/calendrier/${startDate}?m=${startDate.slice(0, 7)}&ok=event`, 303);
+  }
+}
+
+const backHref = `/calendrier/${event.start_date}?m=${event.start_date.slice(0, 7)}`;
+const confirmDelete = 'Supprimer définitivement « ' + event.title.replace(/["«»]/g, "'") + ' » du calendrier ?';
+---
+
+<Layout title={`Modifier — ${event.title} — Sharing Fair`}>
+  <div class="max-w-2xl mx-auto space-y-6">
+    <PageHeader
+      title={`Modifier « ${event.title} »`}
+      crumbs={[
+        { label: 'Calendrier', href: `/calendrier?m=${event.start_date.slice(0, 7)}` },
+        { label: event.title, href: backHref },
+        { label: 'Modifier' },
+      ]}
+    />
+
+    {error && <ToastAnimated type="danger" message={error} />}
+
+    <EventForm event={event} action={`/calendrier/evenement/${id}`} cancelHref={backHref} defaultStartDate={event.start_date} />
+
+    <!-- Suppression -->
+    <section class="surface p-5 border-danger-200/70">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-semibold text-danger-700">Supprimer cet événement</h3>
+          <p class="text-xs text-ink-500 mt-0.5">Action définitive, visible par toute l'équipe.</p>
+        </div>
+        <form
+          method="POST"
+          action={`/calendrier/evenement/${id}/supprimer`}
+          data-confirm={confirmDelete}
+        >
+          <Button type="submit" variant="danger">
+            <Icon name="trash" size={16} />
+            Supprimer
+          </Button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <script is:inline>
+    document.querySelectorAll('form[data-confirm]').forEach((f) => {
+      f.addEventListener('submit', (e) => {
+        if (!window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+      });
+    });
+  </script>
+</Layout>

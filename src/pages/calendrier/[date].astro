@@ -13,6 +13,11 @@ import {
   isPresenceStatus,
   type PresenceStatus,
 } from '../../lib/volunteers';
+import {
+  listEventsBetween,
+  formatEventDateRange,
+  isMultiDay,
+} from '../../lib/events';
 
 // ============================================================
 // Paramètre de route : date ISO YYYY-MM-DD (recalée au mois sinon)
@@ -60,9 +65,10 @@ if (Astro.request.method === 'POST') {
 // ============================================================
 // Données du jour : toute l'équipe + statuts déclarés
 // ============================================================
-const [volunteers, rows] = await Promise.all([
+const [volunteers, rows, dayEvents] = await Promise.all([
   listVolunteers(DB),
   listPresencesBetween(DB, dateParam, dateParam),
+  listEventsBetween(DB, dateParam, dateParam),
 ]);
 const statusByVolunteer = new Map(rows.map((r) => [r.volunteer_id, r.status]));
 
@@ -94,6 +100,8 @@ const toastMessages: Record<string, string> = {
   maybe: 'Réponse enregistrée : peut-être 🤔',
   absent: 'Absence enregistrée. Merci d\'avoir prévenu !',
   efface: 'Votre réponse a été retirée.',
+  event: 'Événement enregistré ✅',
+  'event-supprime': 'Événement supprimé du calendrier.',
 };
 const toast = ok ? toastMessages[ok] : null;
 
@@ -122,6 +130,67 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
     />
 
     {toast && <ToastAnimated type="success" message={toast} />}
+
+    <!-- Événements du jour -->
+    <section class="space-y-3 animate-slide-up">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-500 flex items-center gap-2">
+          <Icon name="calendar" size={15} class="text-brand-600" />
+          {dayEvents.length > 0 ? `${dayEvents.length} événement${dayEvents.length > 1 ? 's' : ''} ce jour` : 'Aucun événement ce jour'}
+        </h2>
+        <a
+          href={`/calendrier/evenement/nouveau?date=${dateParam}`}
+          class="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:text-brand-800 transition-colors"
+        >
+          <Icon name="plus" size={13} />
+          Ajouter
+        </a>
+      </div>
+
+      {dayEvents.map((e) => (
+        <article class="surface border-l-4 border-l-brand-500 p-4 sm:p-5 space-y-2.5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="font-display text-lg font-semibold text-ink-900 leading-tight">{e.title}</h3>
+              {isMultiDay(e) && (
+                <p class="text-xs text-brand-700 font-medium capitalize mt-0.5">{formatEventDateRange(e)}</p>
+              )}
+            </div>
+            <a
+              href={`/calendrier/evenement/${e.id}`}
+              class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-brand-700 hover:bg-brand-50 transition-colors shrink-0"
+              aria-label={`Modifier ${e.title}`}
+            >
+              <Icon name="edit" size={16} />
+            </a>
+          </div>
+
+          {e.hours && (
+            <p class="flex items-center gap-2 text-sm text-ink-700">
+              <Icon name="calendar" size={14} class="text-ink-400 shrink-0" />
+              {e.hours}
+            </p>
+          )}
+          {e.volunteers_text && (
+            <p class="flex items-start gap-2 text-sm text-ink-700">
+              <Icon name="users" size={14} class="text-ink-400 shrink-0 mt-0.5" />
+              <span><strong class="font-medium text-ink-500">Bénévoles :</strong> {e.volunteers_text}</span>
+            </p>
+          )}
+          {e.contact && (
+            <p class="flex items-start gap-2 text-sm text-ink-700">
+              <Icon name="phone" size={14} class="text-ink-400 shrink-0 mt-0.5" />
+              <span><strong class="font-medium text-ink-500">Contact :</strong> {e.contact}</span>
+            </p>
+          )}
+          {e.notes && (
+            <p class="text-sm text-ink-600 bg-ink-50 border border-ink-100 rounded-lg px-3 py-2 italic">
+              {e.notes}
+            </p>
+          )}
+        </article>
+      ))}
+    </section>
 
     <!-- Ma présence -->
     <section class="surface p-5 sm:p-6 animate-slide-up">

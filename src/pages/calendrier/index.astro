@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import PageHeader from '../../components/ui/PageHeader.astro';
 import Icon from '../../components/ui/Icon.astro';
 import { listPresencesBetween, type PresenceStatus, type PresenceWithName } from '../../lib/volunteers';
+import { listEventsBetween, eachCoveredDay, isMultiDay, type CalendarEvent } from '../../lib/events';
 
 const DB = Astro.locals.runtime.env.DB;
 
@@ -17,10 +18,7 @@ function parisTodayParts(): { y: number; m: number; d: number; iso: string } {
     day: '2-digit',
   });
   const p = Object.fromEntries(fmt.formatToParts(new Date()).map((x) => [x.type, x.value]));
-  const y = Number(p.year);
-  const m = Number(p.month);
-  const d = Number(p.day);
-  return { y, m, d, iso: `${p.year}-${p.month}-${p.day}` };
+  return { y: Number(p.year), m: Number(p.month), d: Number(p.day), iso: `${p.year}-${p.month}-${p.day}` };
 }
 
 const today = parisTodayParts();
@@ -33,7 +31,7 @@ const month = monthValid ? Number(mMatch[2]) : today.m; // 1..12
 const currentParam = `${year}-${String(month).padStart(2, '0')}`;
 
 // ============================================================
-// Grille de 6 semaines × 7 jours, semaine commençant le lundi
+// Grille de 6 semaines × 7 jours (vue bureau), semaine = lundi
 // ============================================================
 const m0 = month - 1;
 const firstDow = (new Date(Date.UTC(year, m0, 1)).getUTCDay() + 6) % 7;
@@ -43,6 +41,7 @@ interface Cell {
   iso: string;
   day: number;
   inMonth: boolean;
+  dow: number; // 0 = lundi
 }
 const cells: Cell[] = Array.from({ length: 42 }, (_, i) => {
   const d = new Date(gridStart.getTime() + i * 86400000);
@@ -50,24 +49,40 @@ const cells: Cell[] = Array.from({ length: 42 }, (_, i) => {
     iso: d.toISOString().slice(0, 10),
     day: d.getUTCDate(),
     inMonth: d.getUTCMonth() === m0,
+    dow: (d.getUTCDay() + 6) % 7,
   };
 });
+const monthDays = cells.filter((c) => c.inMonth); // pour la vue liste (mobile)
 
 // ============================================================
-// Présences de toute l'équipe sur la plage visible
+// Données : présences + événements sur la plage visible
 // ============================================================
-const rows = await listPresencesBetween(DB, cells[0].iso, cells[41].iso);
+const rangeStart = cells[0].iso;
+const rangeEnd = cells[41].iso;
+
+const [presenceRows, eventRows] = await Promise.all([
+  listPresencesBetween(DB, rangeStart, rangeEnd),
+  listEventsBetween(DB, rangeStart, rangeEnd),
+]);
+
 const byDate = new Map<string, PresenceWithName[]>();
-for (const r of rows) {
+for (const r of presenceRows) {
   const list = byDate.get(r.date);
   if (list) list.push(r);
   else byDate.set(r.date, [r]);
 }
-
-// Tri d'affichage : présents d'abord, puis peut-être, puis absents.
 const statusOrder: Record<PresenceStatus, number> = { present: 0, maybe: 1, absent: 2 };
 for (const list of byDate.values()) {
   list.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+}
+
+const eventsByDate = new Map<string, CalendarEvent[]>();
+for (const e of eventRows) {
+  for (const day of eachCoveredDay(e.start_date, e.end_date, rangeStart, rangeEnd)) {
+    const list = eventsByDate.get(day);
+    if (list) list.push(e);
+    else eventsByDate.set(day, [e]);
+  }
 }
 
 // ============================================================
@@ -101,50 +116,59 @@ const STATUS_DOT: Record<PresenceStatus, string> = {
   maybe: 'bg-warning-500',
   absent: 'bg-danger-500',
 };
+const EVENT_CHIP = 'bg-brand-100 text-brand-800 ring-brand-200';
 
-const MAX_CHIPS = 3; // pastilles nommées max par cellule (desktop)
-const MAX_DOTS = 6;  // pastilles colorées max par cellule (mobile)
+const MAX_ROWS = 3;  // lignes (événements + présences) max par cellule (bureau)
+const MAX_DOTS = 6;  // points colorés max par cellule
 ---
 
 <Layout title="Calendrier — Sharing Fair">
   <div class="space-y-5">
     <PageHeader
       title="Calendrier"
-      description="Présences de l'équipe en boutique. Touchez un jour pour voir le détail et déclarer votre présence."
+      description="Ventes de l'équipe et présences en boutique. Touchez un jour pour voir le détail et déclarer votre présence."
     >
       <a
         slot="actions"
-        href={`/calendrier/${today.iso}?m=${currentParam}`}
-        class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
+        href="/calendrier/evenement/nouveau"
+        class="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3.5 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
       >
-        <Icon name="check" size={16} class="text-brand-600" />
+        <Icon name="plus" size={16} class="text-brand-600" />
+        <span class="hidden sm:inline">Événement</span>
+      </a>
+      <a
+        slot="actions"
+        href={`/calendrier/${today.iso}?m=${currentParam}`}
+        class="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3.5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 transition-all"
+      >
+        <Icon name="check" size={16} />
         Ma présence aujourd'hui
       </a>
     </PageHeader>
 
     <div class="surface overflow-hidden animate-fade-in">
       <!-- Barre de navigation du mois -->
-      <div class="flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b border-ink-200/80">
+      <div class="flex items-center justify-between gap-2 px-3 sm:px-5 py-3.5 border-b border-ink-200/80">
         <h2 class="font-display text-xl sm:text-2xl font-semibold text-ink-900 tracking-tight capitalize">
           {monthLabel}
         </h2>
         <div class="flex items-center gap-1">
           <a
             href={`/calendrier?m=${prevParam}`}
-            class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+            class="inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
             aria-label="Mois précédent"
           >
             <Icon name="arrow-left" size={18} />
           </a>
           <a
             href={`/calendrier?m=${todayParam}`}
-            class="inline-flex items-center h-9 px-3 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100 transition-colors"
+            class="inline-flex items-center h-10 sm:h-9 px-3 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100 transition-colors"
           >
             Aujourd'hui
           </a>
           <a
             href={`/calendrier?m=${nextParam}`}
-            class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+            class="inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
             aria-label="Mois suivant"
           >
             <Icon name="arrow-right" size={18} />
@@ -152,81 +176,139 @@ const MAX_DOTS = 6;  // pastilles colorées max par cellule (mobile)
         </div>
       </div>
 
-      <!-- En-têtes des jours -->
-      <div class="grid grid-cols-7 border-b border-ink-200/80 bg-ink-50/60">
-        {WEEKDAYS.map((d) => (
-          <div class="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-            {d}
-          </div>
-        ))}
-      </div>
-
-      <!-- Grille du mois -->
-      <div class="grid grid-cols-7">
-        {cells.map((cell, i) => {
+      {/* ============ VUE MOBILE : liste des jours du mois ============ */}
+      <div class="sm:hidden divide-y divide-ink-100">
+        {monthDays.map((cell) => {
+          const evts = eventsByDate.get(cell.iso) ?? [];
           const presences = byDate.get(cell.iso) ?? [];
           const isToday = cell.iso === today.iso;
-          const isLastCol = i % 7 === 6;
+          const empty = evts.length === 0 && presences.length === 0;
           return (
             <a
               href={`/calendrier/${cell.iso}?m=${currentParam}`}
-              class={[
-                'group relative min-h-[68px] sm:min-h-[104px] p-1.5 sm:p-2 flex flex-col gap-1 transition-colors border-b border-ink-100',
-                isLastCol ? '' : 'border-r',
-                cell.inMonth ? 'bg-white hover:bg-brand-50/50' : 'bg-ink-50/40 hover:bg-ink-100/40',
-              ].join(' ')}
+              class={`flex gap-3 px-3 py-2.5 min-h-[52px] transition-colors active:bg-brand-50/70 ${isToday ? 'bg-brand-50/50' : ''}`}
             >
-              <span class="flex items-center justify-center">
+              <div class="flex flex-col items-center w-9 shrink-0 pt-0.5">
                 <span
-                  class={[
-                    'inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-xs sm:text-sm font-medium',
-                    isToday
-                      ? 'bg-brand-500 text-white shadow-sm font-semibold'
-                      : cell.inMonth
-                        ? 'text-ink-800 group-hover:text-brand-700'
-                        : 'text-ink-300',
-                  ].join(' ')}
+                  class={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm ${
+                    isToday ? 'bg-brand-500 text-white font-semibold shadow-sm' : 'text-ink-800 font-medium'
+                  }`}
                 >
                   {cell.day}
                 </span>
-              </span>
-
-              {/* Pastilles nommées (desktop) */}
-              <span class="hidden sm:flex flex-col gap-0.5">
-                {presences.slice(0, MAX_CHIPS).map((p) => (
-                  <span
-                    title={`${p.first_name} ${p.last_name} — ${STATUS_LABEL[p.status]}`}
-                    class={`truncate px-1.5 py-0.5 rounded-md text-[10px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
-                  >
-                    {p.first_name}
+                <span class="text-[10px] font-medium uppercase tracking-wide text-ink-400 mt-0.5">
+                  {WEEKDAYS[cell.dow]}
+                </span>
+              </div>
+              <div class="flex-1 min-w-0 flex flex-col gap-1 justify-center py-0.5">
+                {evts.map((e) => (
+                  <span class={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold ring-1 ring-inset ${EVENT_CHIP}`}>
+                    <Icon name="calendar" size={12} class="shrink-0" />
+                    <span class="truncate">
+                      {e.title}
+                      {isMultiDay(e) && ` (jusqu'au ${e.end_date.slice(8)})`}
+                      {e.hours ? ` · ${e.hours}` : ''}
+                    </span>
                   </span>
                 ))}
-                {presences.length > MAX_CHIPS && (
-                  <span class="px-1.5 text-[10px] font-medium text-ink-400">
-                    +{presences.length - MAX_CHIPS}
+                {presences.length > 0 && (
+                  <span class="flex flex-wrap gap-1">
+                    {presences.map((p) => (
+                      <span
+                        class={`px-1.5 py-0.5 rounded-md text-[11px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
+                      >
+                        {p.first_name}
+                      </span>
+                    ))}
                   </span>
                 )}
-              </span>
-
-              {/* Pastilles colorées (mobile) */}
-              <span class="flex sm:hidden flex-wrap gap-1 px-0.5">
-                {presences.slice(0, MAX_DOTS).map((p) => (
-                  <span class={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[p.status]}`} aria-hidden="true" />
-                ))}
-                {presences.length > MAX_DOTS && (
-                  <span class="text-[9px] font-medium text-ink-400 leading-none">
-                    +{presences.length - MAX_DOTS}
-                  </span>
-                )}
-              </span>
+                {empty && <span class="text-xs text-ink-300 pl-2">—</span>}
+              </div>
+              <Icon name="chevron-right" size={14} class="self-center text-ink-300 shrink-0" />
             </a>
           );
         })}
+      </div>
+
+      {/* ============ VUE BUREAU : grille 7 colonnes ============ */}
+      <div class="hidden sm:block">
+        <!-- En-têtes des jours -->
+        <div class="grid grid-cols-7 border-b border-ink-200/80 bg-ink-50/60">
+          {WEEKDAYS.map((d) => (
+            <div class="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        <div class="grid grid-cols-7">
+          {cells.map((cell, i) => {
+            const evts = eventsByDate.get(cell.iso) ?? [];
+            const presences = byDate.get(cell.iso) ?? [];
+            const isToday = cell.iso === today.iso;
+            const isLastCol = i % 7 === 6;
+            const shownEvents = evts.slice(0, MAX_ROWS);
+            const shownPresences = presences.slice(0, Math.max(0, MAX_ROWS - shownEvents.length));
+            const overflow = (evts.length - shownEvents.length) + (presences.length - shownPresences.length);
+            return (
+              <a
+                href={`/calendrier/${cell.iso}?m=${currentParam}`}
+                class={[
+                  'group relative min-h-[104px] p-1.5 sm:p-2 flex flex-col gap-1 transition-colors border-b border-ink-100',
+                  isLastCol ? '' : 'border-r',
+                  cell.inMonth ? 'bg-white hover:bg-brand-50/50' : 'bg-ink-50/40 hover:bg-ink-100/40',
+                ].join(' ')}
+              >
+                <span class="flex items-center justify-center">
+                  <span
+                    class={[
+                      'inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium',
+                      isToday
+                        ? 'bg-brand-500 text-white shadow-sm font-semibold'
+                        : cell.inMonth
+                          ? 'text-ink-800 group-hover:text-brand-700'
+                          : 'text-ink-300',
+                    ].join(' ')}
+                  >
+                    {cell.day}
+                  </span>
+                </span>
+
+                <span class="flex flex-col gap-0.5">
+                  {shownEvents.map((e) => (
+                    <span
+                      title={`${e.title}${isMultiDay(e) ? ` (du ${e.start_date} au ${e.end_date})` : ''}${e.hours ? ` — ${e.hours}` : ''}`}
+                      class={`flex items-center gap-1 truncate px-1.5 py-0.5 rounded-md text-[10px] font-semibold ring-1 ring-inset ${EVENT_CHIP}`}
+                    >
+                      <Icon name="calendar" size={10} class="shrink-0" />
+                      <span class="truncate">{e.title}</span>
+                    </span>
+                  ))}
+                  {shownPresences.map((p) => (
+                    <span
+                      title={`${p.first_name} ${p.last_name} — ${STATUS_LABEL[p.status]}`}
+                      class={`truncate px-1.5 py-0.5 rounded-md text-[10px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
+                    >
+                      {p.first_name}
+                    </span>
+                  ))}
+                  {overflow > 0 && (
+                    <span class="px-1.5 text-[10px] font-medium text-ink-400">+{overflow}</span>
+                  )}
+                </span>
+              </a>
+            );
+          })}
+        </div>
       </div>
     </div>
 
     <!-- Légende -->
     <div class="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-ink-500">
+      <span class={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ring-1 ring-inset font-semibold ${EVENT_CHIP}`}>
+        <Icon name="calendar" size={12} />
+        Vente / événement
+      </span>
       <span class="inline-flex items-center gap-1.5">
         <span class={`w-2.5 h-2.5 rounded-full ${STATUS_DOT.present}`} aria-hidden="true" />
         Présent
@@ -239,7 +321,6 @@ const MAX_DOTS = 6;  // pastilles colorées max par cellule (mobile)
         <span class={`w-2.5 h-2.5 rounded-full ${STATUS_DOT.absent}`} aria-hidden="true" />
         Absent
       </span>
-      <span class="text-ink-400 ml-auto hidden sm:inline">Chacun déclare sa propre présence en touchant un jour.</span>
     </div>
   </div>
 </Layout>

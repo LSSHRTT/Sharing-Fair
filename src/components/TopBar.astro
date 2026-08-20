@@ -10,6 +10,7 @@ else if (/^\/clients\/\d+\/modifier/.test(path)) title = 'Modifier le client';
 else if (/^\/clients\/\d+\/?$/.test(path)) title = 'Fiche client';
 else if (path.startsWith('/clients')) title = 'Clients';
 else if (/^\/calendrier\/\d{4}-\d{2}-\d{2}/.test(path)) title = 'Journée';
+else if (path.startsWith('/calendrier/evenement')) title = 'Événement';
 else if (path.startsWith('/calendrier')) title = 'Calendrier';
 else if (path.startsWith('/equipe')) title = 'Équipe';
 

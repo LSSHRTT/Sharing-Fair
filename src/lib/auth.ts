@@ -1,5 +1,9 @@
 const COOKIE_NAME = 'sf_session';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+// Plafond technique de validité d'un jeton (~13 mois). La durée réelle de la
+// session dépend du cookie : session navigateur seule, ou cookie longue durée
+// quand « Rester connecté » est coché.
+const TOKEN_MAX_AGE = 60 * 60 * 24 * 400;
+const REMEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 400;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -60,7 +64,7 @@ export async function verifySessionToken(
   const issuedAt = parseInt(issued, 36);
   if (!Number.isFinite(issuedAt)) return null;
   const ageSec = (Date.now() - issuedAt) / 1000;
-  if (ageSec < 0 || ageSec >= COOKIE_MAX_AGE) return null;
+  if (ageSec < 0 || ageSec >= TOKEN_MAX_AGE) return null;
 
   return volunteerId;
 }
@@ -69,6 +73,11 @@ export function sessionCookieName(): string {
   return COOKIE_NAME;
 }
 
-export function sessionCookieMaxAge(): number {
-  return COOKIE_MAX_AGE;
+/**
+ * Durée du cookie de session.
+ * - remember = true  → cookie persistant (~13 mois) : « Rester connecté ».
+ * - remember = false → cookie de session navigateur (undefined = sans maxAge).
+ */
+export function sessionCookieMaxAge(remember: boolean): number | undefined {
+  return remember ? REMEMBER_COOKIE_MAX_AGE : undefined;
 }

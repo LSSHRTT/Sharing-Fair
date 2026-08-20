@@ -1,0 +1,67 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import ToastAnimated from '../../../components/ui/ToastAnimated.astro';
+import EventForm from '../../../components/events/EventForm.astro';
+import { createEvent, isValidIsoDate } from '../../../lib/events';
+
+const DB = Astro.locals.runtime.env.DB;
+
+// Date pré-remplie (depuis la page jour) : ?date=YYYY-MM-DD
+const dateParam = Astro.url.searchParams.get('date') ?? '';
+const defaultStartDate = isValidIsoDate(dateParam)
+  ? dateParam
+  : new Date().toISOString().slice(0, 10);
+
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const title = String(form.get('title') ?? '').trim();
+  const startDate = String(form.get('start_date') ?? '').trim();
+  let endDate = String(form.get('end_date') ?? '').trim();
+  if (!endDate) endDate = startDate;
+  const hours = String(form.get('hours') ?? '').trim() || null;
+  const volunteersText = String(form.get('volunteers_text') ?? '').trim() || null;
+  const contact = String(form.get('contact') ?? '').trim() || null;
+  const notes = String(form.get('notes') ?? '').trim() || null;
+
+  if (!title || title.length > 150) {
+    error = "Le titre est requis (150 caractères maximum).";
+  } else if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate) || endDate < startDate) {
+    error = 'Dates invalides : la date de fin doit être postérieure ou égale à la date de début.';
+  } else {
+    await createEvent(DB, {
+      title,
+      start_date: startDate,
+      end_date: endDate,
+      hours,
+      volunteers_text: volunteersText,
+      contact,
+      notes,
+    });
+    return Astro.redirect(`/calendrier/${startDate}?m=${startDate.slice(0, 7)}&ok=event`, 303);
+  }
+}
+---
+
+<Layout title="Nouvel événement — Calendrier — Sharing Fair">
+  <div class="max-w-2xl mx-auto space-y-6">
+    <PageHeader
+      title="Nouvel événement"
+      crumbs={[
+        { label: 'Calendrier', href: `/calendrier?m=${defaultStartDate.slice(0, 7)}` },
+        { label: 'Nouvel événement' },
+      ]}
+      description="Vente, crèche de Noël, sortie… L'événement sera visible par toute l'équipe sur le calendrier."
+    />
+
+    {error && <ToastAnimated type="danger" message={error} />}
+
+    <EventForm
+      action="/calendrier/evenement/nouveau"
+      cancelHref={`/calendrier?m=${defaultStartDate.slice(0, 7)}`}
+      defaultStartDate={defaultStartDate}
+    />
+  </div>
+</Layout>

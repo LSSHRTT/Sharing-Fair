@@ -71,7 +71,7 @@ const items = [
 
   <!-- Footer -->
   <div class="px-4 py-4 border-t border-ink-200/80 flex items-center justify-between text-[11px] text-ink-400">
-    <span class="font-medium">v0.2.0</span>
+    <span class="font-medium">v0.3.0</span>
     <a href="/logout" class="inline-flex items-center gap-1 hover:text-brand-700 transition-colors font-medium">
       <Icon name="arrow-right" size={12} />
       Déconnexion
@@ -88,27 +88,40 @@ const items = [
 
 <script is:inline>
   (function () {
-    const sidebar = document.getElementById('app-sidebar');
-    const backdrop = document.getElementById('sidebar-backdrop');
-    const toggle = document.getElementById('sidebar-toggle');
-    if (!sidebar || !backdrop || !toggle) return;
-
+    // Délégation d'événements : le bouton #sidebar-toggle vit dans la TopBar
+    // (après ce script dans le DOM) — on écoute donc au niveau document.
+    const isOpen = () => {
+      const s = document.getElementById('app-sidebar');
+      return !!s && !s.classList.contains('-translate-x-full');
+    };
     const open = () => {
-      sidebar.classList.remove('-translate-x-full');
-      sidebar.classList.add('translate-x-0');
-      backdrop.classList.remove('hidden');
+      const s = document.getElementById('app-sidebar');
+      const b = document.getElementById('sidebar-backdrop');
+      if (!s || !b) return;
+      s.classList.remove('-translate-x-full');
+      s.classList.add('translate-x-0');
+      b.classList.remove('hidden');
       document.body.style.overflow = 'hidden';
     };
     const close = () => {
-      sidebar.classList.add('-translate-x-full');
-      sidebar.classList.remove('translate-x-0');
-      backdrop.classList.add('hidden');
+      const s = document.getElementById('app-sidebar');
+      const b = document.getElementById('sidebar-backdrop');
+      if (!s || !b) return;
+      s.classList.add('-translate-x-full');
+      s.classList.remove('translate-x-0');
+      b.classList.add('hidden');
       document.body.style.overflow = '';
     };
-    const isOpen = () => !sidebar.classList.contains('-translate-x-full');
 
-    toggle.addEventListener('click', () => (isOpen() ? close() : open()));
-    backdrop.addEventListener('click', close);
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#sidebar-toggle')) {
+        isOpen() ? close() : open();
+        return;
+      }
+      if (e.target.closest('#sidebar-backdrop')) {
+        close();
+      }
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && isOpen()) close();
     });

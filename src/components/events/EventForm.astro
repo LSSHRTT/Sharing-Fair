@@ -1,0 +1,115 @@
+---
+import Field from '../ui/Field.astro';
+import Input from '../ui/Input.astro';
+import Textarea from '../ui/Textarea.astro';
+import Button from '../ui/Button.astro';
+import Icon from '../ui/Icon.astro';
+import type { CalendarEvent } from '../../lib/events';
+
+interface Props {
+  event?: CalendarEvent;
+  action: string;
+  cancelHref: string;
+  defaultStartDate: string;
+}
+
+const { event, action, cancelHref, defaultStartDate } = Astro.props;
+---
+
+<form method="POST" action={action} class="surface p-5 sm:p-6 space-y-5 animate-slide-up">
+  <Field label="Titre de l'événement" required for="title">
+    <Input
+      id="title"
+      name="title"
+      type="text"
+      required
+      maxlength={150}
+      value={event?.title}
+      placeholder="Ex. Cormelles le Royal (paroisse), Crèches de Noël…"
+    />
+  </Field>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <Field label="Date de début" required for="start_date">
+      <Input
+        id="start_date"
+        name="start_date"
+        type="date"
+        required
+        value={event?.start_date ?? defaultStartDate}
+      />
+    </Field>
+    <Field label="Date de fin" for="end_date" hint="Laisser égal à la date de début si l'événement dure un seul jour.">
+      <Input
+        id="end_date"
+        name="end_date"
+        type="date"
+        value={event?.end_date ?? defaultStartDate}
+      />
+    </Field>
+  </div>
+
+  <Field label="Horaires" for="hours">
+    <Input
+      id="hours"
+      name="hours"
+      type="text"
+      maxlength={120}
+      value={event?.hours ?? ''}
+      placeholder="Ex. 14h à 18h, toute la journée, après-midi…"
+    />
+  </Field>
+
+  <Field label="Bénévoles engagées" for="volunteers_text" hint="Texte libre (prénoms, initiales…).">
+    <Input
+      id="volunteers_text"
+      name="volunteers_text"
+      type="text"
+      maxlength={300}
+      value={event?.volunteers_text ?? ''}
+      placeholder="Ex. Marta, Michelle, Geneviève B."
+    />
+  </Field>
+
+  <Field label="Personne contact" for="contact">
+    <Input
+      id="contact"
+      name="contact"
+      type="text"
+      maxlength={300}
+      value={event?.contact ?? ''}
+      placeholder="Ex. Marta — confirmation + attente feuille inscription"
+    />
+  </Field>
+
+  <Field label="Notes" for="notes">
+    <Textarea
+      id="notes"
+      name="notes"
+      rows={3}
+      maxlength={2000}
+      value={event?.notes ?? ''}
+      placeholder="Ex. réserver le véhicule RENAULT 9 places"
+    />
+  </Field>
+
+  <div class="flex items-center gap-3 pt-1">
+    <Button type="submit" variant="primary">
+      <Icon name="check" size={16} />
+      {event ? 'Enregistrer les modifications' : "Créer l'événement"}
+    </Button>
+    <Button href={cancelHref} variant="ghost">Annuler</Button>
+  </div>
+</form>
+
+<script is:inline>
+  // Si la date de fin est vide, elle suit la date de début.
+  (() => {
+    const start = document.getElementById('start_date');
+    const end = document.getElementById('end_date');
+    if (!start || !end) return;
+    start.addEventListener('change', () => {
+      if (!end.value || end.value < start.value) end.value = start.value;
+    });
+  })();
+</script>

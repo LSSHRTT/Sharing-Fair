@@ -16,6 +16,7 @@ interface Props {
   max?: string | number;
   pattern?: string;
   autocomplete?: string;
+  inputmode?: 'text' | 'numeric' | 'decimal' | 'tel' | 'email' | 'url' | 'search';
   hasError?: boolean;
   class?: string;
   iconLeft?: boolean;
@@ -30,8 +31,9 @@ const {
   ...rest
 } = Astro.props;
 
+// text-base (16px) sur mobile : évite le zoom automatique d'iOS Safari au focus.
 const base =
-  'block w-full h-10 rounded-lg border bg-white text-sm text-ink-900 placeholder-ink-400 shadow-xs transition-all duration-150 focus:outline-none focus:ring-4 disabled:bg-ink-50 disabled:text-ink-500 disabled:cursor-not-allowed';
+  'block w-full h-10 rounded-lg border bg-white text-base sm:text-sm text-ink-900 placeholder-ink-400 shadow-xs transition-all duration-150 focus:outline-none focus:ring-4 disabled:bg-ink-50 disabled:text-ink-500 disabled:cursor-not-allowed';
 
 const normal = 'border-ink-200 hover:border-ink-300 focus:border-brand-500 focus:ring-brand-500/15';
 const error = 'border-danger-300 focus:border-danger-500 focus:ring-danger-500/15';
