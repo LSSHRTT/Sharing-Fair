@@ -54,6 +54,7 @@ if (Astro.request.method === 'POST') {
       'event_added',
       `${actor.first_name} ${actor.last_name} a ajouté l'événement « ${title} »`,
       `/calendrier/${startDate}?m=${startDate.slice(0, 7)}`,
+      Astro.locals.runtime as never,
     );
     return Astro.redirect(`/calendrier/${startDate}?m=${startDate.slice(0, 7)}&ok=event`, 303);
   }

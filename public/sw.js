@@ -6,7 +6,7 @@
    - Assets statiques & polices : cache d'abord
    ============================================================ */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `sharing-fair-${VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
@@ -87,4 +87,53 @@ self.addEventListener('fetch', (event) => {
       })
     );
   }
+});
+
+/* ============================================================
+   Notifications push (tickle → on récupère le détail via l'API)
+   ============================================================ */
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    (async () => {
+      let body = "Nouvelle activité dans la boutique — ouvrez l'app pour voir le détail.";
+      let url = '/notifications';
+      try {
+        // Le cookie de session authentifie l'appel (credentials same-origin).
+        const r = await fetch('/api/notifications/latest', { credentials: 'same-origin' });
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.label) body = d.label;
+          if (d && d.href) url = d.href;
+        }
+      } catch { /* hors ligne → message générique */ }
+
+      await self.registration.showNotification('Sharing Fair', {
+        body,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag: 'sharing-fair-activity',
+        renotify: true,
+        data: { url },
+      });
+    })(),
+  );
+});
+
+/* Clic sur la notification → ouvre/focalise l'app à la bonne page. */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/notifications';
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((list) => {
+        for (const c of list) {
+          if ('focus' in c) {
+            c.navigate(target);
+            return c.focus();
+          }
+        }
+        return clients.openWindow(target);
+      }),
+  );
 });

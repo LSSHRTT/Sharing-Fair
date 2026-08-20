@@ -18,8 +18,10 @@ import {
 } from '../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
+const env = Astro.locals.runtime.env;
 const meIdentity = Astro.locals.volunteer!;
 const me = await getVolunteerFullById(DB, meIdentity.id);
+const vapidPublicKey = env.VAPID_PUBLIC_KEY ?? '';
 if (!me) {
   return Astro.redirect('/logout', 302);
 }
@@ -152,6 +154,29 @@ const hasCustomPassword = !!me.password;
       </div>
     </section>
 
+    <!-- ===== Notifications push sur cet appareil ===== -->
+    <section class="surface p-5 sm:p-6 animate-slide-up" style="animation-delay: 0.03s">
+      <h2 class="text-base font-semibold text-ink-900 mb-1 flex items-center gap-2">
+        <Icon name="bell" size={16} class="text-brand-600" />
+        Notifications sur cet appareil
+      </h2>
+      <p class="text-sm text-ink-500 mb-4">
+        Recevez une alerte sur ce téléphone quand un bénévole ou un événement est ajouté…
+        <span class="block text-xs text-ink-400 mt-1">
+          📱 iPhone : installez d'abord l'app sur l'écran d'accueil (Partager → Sur l'écran d'accueil), puis activez ici.
+        </span>
+      </p>
+      <button
+        type="button"
+        id="push-toggle"
+        data-vapid={vapidPublicKey}
+        class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 transition-all active:scale-[0.98] disabled:opacity-50 w-full sm:w-auto"
+      >
+        Vérification…
+      </button>
+      <p id="push-status" class="text-xs text-ink-500 mt-2.5"></p>
+    </section>
+
     <!-- ===== Coordonnées ===== -->
     <section class="surface p-5 sm:p-6 animate-slide-up" style="animation-delay: 0.06s">
       <h2 class="text-base font-semibold text-ink-900 mb-1 flex items-center gap-2">
@@ -250,6 +275,88 @@ const hasCustomPassword = !!me.password;
   </div>
 
   <script is:inline>
+    // Activation/désactivation des notifications push sur CET appareil.
+    (() => {
+      const btn = document.getElementById('push-toggle');
+      const status = document.getElementById('push-status');
+      if (!btn || !status) return;
+      const vapidKey = btn.getAttribute('data-vapid') || '';
+
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      if (!supported || !vapidKey) {
+        btn.disabled = true;
+        btn.textContent = 'Non pris en charge par ce navigateur';
+        status.textContent = 'Sur iPhone : ouvrez l\'app installée sur l\'écran d\'accueil (PWA) puis réessayez ici.';
+        return;
+      }
+
+      const b64ToUint8 = (b64) => {
+        const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+        const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+        return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      };
+
+      async function refresh() {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) {
+            btn.textContent = 'Désactiver sur cet appareil';
+            btn.dataset.mode = 'off';
+            status.textContent = '✅ Ce téléphone reçoit les notifications push.';
+          } else {
+            btn.textContent = 'Activer sur cet appareil';
+            btn.dataset.mode = 'on';
+            status.textContent =
+              Notification.permission === 'denied'
+                ? 'Notifications bloquées par le navigateur — autorisez-les dans les réglages du site.'
+                : 'Ce téléphone ne reçoit pas (encore) les notifications push.';
+          }
+        } catch { /* indisponible */ }
+      }
+      refresh();
+
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          if (btn.dataset.mode === 'off') {
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+              await fetch('/api/push/unsubscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ endpoint: sub.endpoint }),
+              }).catch(() => {});
+              await sub.unsubscribe();
+            }
+          } else {
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') {
+              status.textContent = 'Permission refusée — impossible d\'activer les notifications.';
+              return;
+            }
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: b64ToUint8(vapidKey),
+            });
+            const r = await fetch('/api/push/subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(sub.toJSON()),
+            });
+            if (!r.ok) throw new Error('server');
+          }
+        } catch {
+          status.textContent = "Échec de l'activation — vérifiez votre connexion et réessayez.";
+          return;
+        } finally {
+          btn.disabled = false;
+        }
+        refresh();
+      });
+    })();
+
     // Confirmation avant réinitialisation du lien d'abonnement.
     document.querySelectorAll('form[data-confirm]').forEach((f) => {
       f.addEventListener('submit', (e) => {

@@ -55,6 +55,7 @@ if (Astro.request.method === 'POST') {
         'volunteer_added',
         `${me.first_name} ${me.last_name} a ajouté ${firstName} ${lastName} à l'équipe`,
         '/equipe',
+        Astro.locals.runtime as never,
       );
       return Astro.redirect('/equipe?ok=ajoute', 303);
     }

@@ -25,11 +25,21 @@ export async function notify(
   type: NotificationType,
   label: string,
   href: string | null = null,
+  runtime?: { env: Record<string, unknown>; ctx: { waitUntil(p: Promise<unknown>): void } },
 ): Promise<void> {
   await db
     .prepare('INSERT INTO notifications (actor_id, type, label, href, created_at) VALUES (?, ?, ?, ?, ?)')
     .bind(actorId, type, label, href, new Date().toISOString())
     .run();
+
+  // Push « tickle » vers les téléphones des autres bénévoles — en tâche de
+  // fond (waitUntil) : jamais bloquant ni cassant pour la requête courante.
+  if (runtime?.ctx) {
+    const { sendPushTickle } = await import('./push');
+    runtime.ctx.waitUntil(
+      sendPushTickle(db, runtime.env as Record<string, string>, actorId).catch(() => {}),
+    );
+  }
 }
 
 export async function listRecentNotifications(db: D1Database, limit = 20): Promise<NotificationRow[]> {
