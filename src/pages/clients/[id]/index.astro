@@ -32,11 +32,11 @@ if (!client) {
         { label: fullName(client) },
       ]}
     >
-      <Button slot="actions" href={`/clients/${client.id}/modifier`} variant="outline">
+      <Button slot="actions" href={`/clients/${client.id}/modifier`} variant="outline" class="flex-1 sm:flex-none justify-center">
         <Icon name="edit" size={16} />
         Modifier
       </Button>
-      <Button slot="actions" variant="danger" data-open-modal="delete-confirm">
+      <Button slot="actions" variant="danger" data-open-modal="delete-confirm" class="flex-1 sm:flex-none justify-center">
         <Icon name="trash" size={16} />
         Supprimer
       </Button>
@@ -83,7 +83,7 @@ if (!client) {
     </Card>
 
     <!-- Metadata -->
-    <div class="flex items-center justify-between text-xs text-ink-400 px-1">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0 text-xs text-ink-400 px-1">
       <div class="flex items-center gap-1.5">
         <Icon name="calendar" size={12} />
         <span>Créé le {formatDateTime(client.created_at)}</span>

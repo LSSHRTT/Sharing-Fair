@@ -146,35 +146,36 @@ const MAX_DOTS = 6;  // points colorés max par cellule
       </a>
     </PageHeader>
 
-    <div class="surface overflow-hidden animate-fade-in">
-      <!-- Barre de navigation du mois -->
-      <div class="flex items-center justify-between gap-2 px-3 sm:px-5 py-3.5 border-b border-ink-200/80">
-        <h2 class="font-display text-xl sm:text-2xl font-semibold text-ink-900 tracking-tight capitalize">
-          {monthLabel}
-        </h2>
-        <div class="flex items-center gap-1">
-          <a
-            href={`/calendrier?m=${prevParam}`}
-            class="inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
-            aria-label="Mois précédent"
-          >
-            <Icon name="arrow-left" size={18} />
-          </a>
-          <a
-            href={`/calendrier?m=${todayParam}`}
-            class="inline-flex items-center h-10 sm:h-9 px-3 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100 transition-colors"
-          >
-            Aujourd'hui
-          </a>
-          <a
-            href={`/calendrier?m=${nextParam}`}
-            class="inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
-            aria-label="Mois suivant"
-          >
-            <Icon name="arrow-right" size={18} />
-          </a>
-        </div>
+    <!-- Barre de navigation du mois — sticky : reste visible au défilement -->
+    <div class="sticky top-16 z-10 surface flex items-center justify-between gap-2 px-3 sm:px-5 py-2.5 sm:py-3.5 bg-white/95 backdrop-blur-md animate-fade-in">
+      <h2 class="font-display text-xl sm:text-2xl font-semibold text-ink-900 tracking-tight capitalize">
+        {monthLabel}
+      </h2>
+      <div class="flex items-center gap-1">
+        <a
+          href={`/calendrier?m=${prevParam}`}
+          class="inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+          aria-label="Mois précédent"
+        >
+          <Icon name="arrow-left" size={18} />
+        </a>
+        <a
+          href={`/calendrier?m=${todayParam}`}
+          class="inline-flex items-center h-10 sm:h-9 px-3 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100 transition-colors"
+        >
+          Aujourd'hui
+        </a>
+        <a
+          href={`/calendrier?m=${nextParam}`}
+          class="inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+          aria-label="Mois suivant"
+        >
+          <Icon name="arrow-right" size={18} />
+        </a>
       </div>
+    </div>
+
+    <div class="surface overflow-hidden animate-fade-in" style="animation-delay: 0.05s">
 
       {/* ============ VUE MOBILE : liste des jours du mois ============ */}
       <div class="sm:hidden divide-y divide-ink-100">

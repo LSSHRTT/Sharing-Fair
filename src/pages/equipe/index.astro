@@ -99,7 +99,7 @@ const toast =
           <Input id="birth_date" name="birth_date" type="date" required min="1900-01-01" max="2015-12-31" />
         </Field>
         <div class="sm:col-span-3">
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="primary" class="w-full sm:w-auto justify-center">
             <Icon name="plus" size={16} />
             Ajouter à l'équipe
           </Button>
@@ -118,14 +118,27 @@ const toast =
           const isMe = v.id === me.id;
           return (
             <li class={`flex items-center gap-3 px-4 sm:px-5 py-3 ${isMe ? 'bg-brand-50/60' : ''}`}>
-              <Avatar firstName={v.first_name} lastName={v.last_name} size="md" />
+              <Avatar firstName={v.first_name} lastName={v.last_name} src={v.photo} size="md" />
               <div class="min-w-0 flex-1 leading-tight">
                 <p class="text-sm font-medium text-ink-900 truncate">
                   {v.first_name} {v.last_name}
                   {isMe && <span class="text-ink-400 font-normal"> (vous)</span>}
                 </p>
-                <p class="text-[11px] text-ink-400 mt-0.5">Dans l'équipe depuis le {formatDate(v.created_at)}</p>
+                <p class="text-[11px] text-ink-400 mt-0.5">
+                  {v.email || v.phone
+                    ? [v.email, v.phone].filter(Boolean).join(' · ')
+                    : `Dans l'équipe depuis le ${formatDate(v.created_at)}`}
+                </p>
               </div>
+              {isMe && (
+                <a
+                  href="/profil"
+                  class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-brand-700 hover:bg-brand-50 transition-colors"
+                  aria-label="Modifier mon profil"
+                >
+                  <Icon name="edit" size={16} />
+                </a>
+              )}
               <form
                 method="POST"
                 action={`/equipe/${v.id}/supprimer`}

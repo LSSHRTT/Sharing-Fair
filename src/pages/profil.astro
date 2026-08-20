@@ -1,0 +1,278 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/ui/PageHeader.astro';
+import Avatar from '../components/ui/Avatar.astro';
+import Button from '../components/ui/Button.astro';
+import Input from '../components/ui/Input.astro';
+import Field from '../components/ui/Field.astro';
+import Icon from '../components/ui/Icon.astro';
+import ToastAnimated from '../components/ui/ToastAnimated.astro';
+import {
+  getVolunteerFullById,
+  updateContact,
+  updatePhoto,
+  updatePassword,
+  verifyCredential,
+} from '../lib/volunteers';
+
+const DB = Astro.locals.runtime.env.DB;
+const meIdentity = Astro.locals.volunteer!;
+const me = await getVolunteerFullById(DB, meIdentity.id);
+if (!me) {
+  return Astro.redirect('/logout', 302);
+}
+
+// ============================================================
+// Actions : coordonnées / photo / mot de passe
+// ============================================================
+let error: string | null = null;
+let success: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  // Le bouton « Réinitialiser » prime le champ caché « action ».
+  const action = form.has('reset_password') ? 'reset_password' : String(form.get('action') ?? '');
+
+  if (action === 'coord') {
+    const email = String(form.get('email') ?? '').trim() || null;
+    const phone = String(form.get('phone') ?? '').trim() || null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      error = 'Adresse email invalide.';
+    } else {
+      await updateContact(DB, me.id, { email, phone });
+      return Astro.redirect('/profil?ok=coord', 303);
+    }
+  } else if (action === 'photo') {
+    const photo = String(form.get('photo') ?? '');
+    if (!photo.startsWith('data:image/') || photo.length > 400_000) {
+      error = "Image trop lourde ou format non pris en charge (max ~300 Ko après redimensionnement).";
+    } else {
+      await updatePhoto(DB, me.id, photo);
+      return Astro.redirect('/profil?ok=photo', 303);
+    }
+  } else if (action === 'delete_photo') {
+    await updatePhoto(DB, me.id, null);
+    return Astro.redirect('/profil?ok=photo-supprime', 303);
+  } else if (action === 'password') {
+    const current = String(form.get('current_password') ?? '');
+    const fresh = String(form.get('new_password') ?? '');
+    const confirm = String(form.get('confirm_password') ?? '');
+    const freshVolunteer = await getVolunteerFullById(DB, me.id);
+    if (!freshVolunteer || !verifyCredential(freshVolunteer, current)) {
+      error = 'Mot de passe actuel incorrect.';
+    } else if (fresh.length < 6 || fresh.length > 64) {
+      error = 'Le nouveau mot de passe doit contenir entre 6 et 64 caractères.';
+    } else if (fresh !== confirm) {
+      error = 'La confirmation ne correspond pas au nouveau mot de passe.';
+    } else {
+      await updatePassword(DB, me.id, fresh.trim());
+      return Astro.redirect('/profil?ok=mdp', 303);
+    }
+  } else if (action === 'reset_password') {
+    await updatePassword(DB, me.id, null);
+    return Astro.redirect('/profil?ok=reset', 303);
+  }
+}
+
+const ok = Astro.url.searchParams.get('ok');
+const toasts: Record<string, string> = {
+  coord: 'Coordonnées enregistrées ✅',
+  photo: 'Photo de profil mise à jour ✅',
+  'photo-supprime': 'Photo de profil supprimée.',
+  mdp: 'Mot de passe changé ✅',
+  reset: 'Mot de passe réinitialisé : votre date de naissance sert à nouveau de mot de passe.',
+};
+const toast = ok ? toasts[ok] : null;
+
+const hasCustomPassword = !!me.password;
+---
+
+<Layout title="Mon profil — Sharing Fair">
+  <div class="max-w-2xl mx-auto space-y-6">
+    <PageHeader title="Mon profil" description="Vos coordonnées, votre photo et votre mot de passe." />
+
+    {toast && <ToastAnimated type="success" message={toast} />}
+    {error && <ToastAnimated type="danger" message={error} />}
+
+    <!-- ===== Photo de profil ===== -->
+    <section id="photo-section" class="surface p-5 sm:p-6 animate-slide-up">
+      <h2 class="text-base font-semibold text-ink-900 mb-4 flex items-center gap-2">
+        <Icon name="heart" size={16} class="text-brand-600" />
+        Photo de profil
+      </h2>
+      <div class="flex items-center gap-4 flex-wrap">
+        <Avatar firstName={me.first_name} lastName={me.last_name} src={me.photo} size="xl" />
+        <div class="flex-1 min-w-[200px] space-y-3">
+          <p class="text-sm text-ink-500">
+            {me.photo
+              ? 'Votre photo est visible par toute l\'équipe (calendrier, liste des bénévoles).'
+              : 'Aucune photo pour le moment — vos initiales sont affichées à la place.'}
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              id="photo-pick"
+              class="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
+            >
+              <Icon name="download" size={16} />
+              {me.photo ? 'Changer de photo' : 'Choisir une photo'}
+            </button>
+            {me.photo && (
+              <form method="POST">
+                <input type="hidden" name="action" value="delete_photo" />
+                <button
+                  type="submit"
+                  class="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-danger-600 hover:bg-danger-50 transition-colors"
+                >
+                  <Icon name="trash" size={16} />
+                  Supprimer
+                </button>
+              </form>
+            )}
+          </div>
+
+          <!-- Formulaire photo caché : rempli après choix + redimensionnement côté navigateur -->
+          <form method="POST" id="photo-form" class="hidden space-y-2">
+            <input type="hidden" name="action" value="photo" />
+            <input type="hidden" name="photo" id="photo-data" />
+            <Button type="submit" variant="primary" size="sm">
+              <Icon name="check" size={16} />
+              Enregistrer la photo
+            </Button>
+            <p id="photo-error" class="hidden text-xs text-danger-600"></p>
+          </form>
+          <input type="file" id="photo-file" accept="image/jpeg,image/png,image/webp" class="hidden" aria-hidden="true" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Coordonnées ===== -->
+    <section class="surface p-5 sm:p-6 animate-slide-up" style="animation-delay: 0.06s">
+      <h2 class="text-base font-semibold text-ink-900 mb-1 flex items-center gap-2">
+        <Icon name="phone" size={16} class="text-brand-600" />
+        Coordonnées
+      </h2>
+      <p class="text-sm text-ink-500 mb-4">
+        Visibles uniquement par l'équipe connectée (facultatif).
+      </p>
+      <form method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="coord" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Email" for="email">
+            <Input id="email" name="email" type="email" value={me.email ?? ''} placeholder="prenom@example.com" autocomplete="email" />
+          </Field>
+          <Field label="Téléphone" for="phone">
+            <Input id="phone" name="phone" type="tel" value={me.phone ?? ''} placeholder="06 12 34 56 78" autocomplete="tel" />
+          </Field>
+        </div>
+        <Button type="submit" variant="primary" class="w-full sm:w-auto justify-center">
+          <Icon name="check" size={16} />
+          Enregistrer les coordonnées
+        </Button>
+      </form>
+    </section>
+
+    <!-- ===== Mot de passe ===== -->
+    <section class="surface p-5 sm:p-6 animate-slide-up" style="animation-delay: 0.12s">
+      <h2 class="text-base font-semibold text-ink-900 mb-1 flex items-center gap-2">
+        <Icon name="shield" size={16} class="text-brand-600" />
+        Mot de passe
+      </h2>
+      <p class="text-sm text-ink-500 mb-4">
+        {hasCustomPassword
+          ? 'Vous utilisez un mot de passe personnalisé.'
+          : 'Votre mot de passe actuel est votre date de naissance (JJ/MM/AAAA).'}
+      </p>
+      <form method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="password" />
+        <Field label="Mot de passe actuel" required for="current_password">
+          <Input
+            id="current_password"
+            name="current_password"
+            type="password"
+            required
+            maxlength={64}
+            placeholder={hasCustomPassword ? 'Votre mot de passe actuel' : 'Votre date de naissance (JJ/MM/AAAA)'}
+            autocomplete="current-password"
+          />
+        </Field>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Nouveau mot de passe" required for="new_password">
+            <Input id="new_password" name="new_password" type="password" required minlength={6} maxlength={64} autocomplete="new-password" />
+          </Field>
+          <Field label="Confirmer" required for="confirm_password">
+            <Input id="confirm_password" name="confirm_password" type="password" required minlength={6} maxlength={64} autocomplete="new-password" />
+          </Field>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="primary" class="w-full sm:w-auto justify-center">
+            <Icon name="check" size={16} />
+            Changer le mot de passe
+          </Button>
+          {hasCustomPassword && (
+            <button
+              type="submit"
+              name="reset_password"
+              value="1"
+              class="text-xs font-medium text-ink-400 hover:text-danger-600 underline underline-offset-2 transition-colors"
+            >
+              Réinitialiser (date de naissance)
+            </button>
+          )}
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script is:inline>
+    // Choix + redimensionnement de la photo côté navigateur :
+    // → JPEG ≤ 256 px (poids ~30-80 Ko), stocké en data URL dans la base.
+    (() => {
+      const pick = document.getElementById('photo-pick');
+      const fileInput = document.getElementById('photo-file');
+      const form = document.getElementById('photo-form');
+      const hidden = document.getElementById('photo-data');
+      const err = document.getElementById('photo-error');
+      if (!pick || !fileInput || !form || !hidden) return;
+
+      pick.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 256;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          URL.revokeObjectURL(url);
+          if (dataUrl.length > 400_000) {
+            err.textContent = "Image trop lourde même après redimensionnement — essayez un recadrage plus serré.";
+            err.classList.remove('hidden');
+            form.classList.add('hidden');
+            return;
+          }
+          err.classList.add('hidden');
+          hidden.value = dataUrl;
+          form.classList.remove('hidden');
+          // Aperçu immédiat dans l'avatar de la section photo
+          const avatar = document.querySelector('#photo-section span.rounded-full.overflow-hidden');
+          if (avatar) avatar.innerHTML = '<img src="' + dataUrl + '" alt="" class="w-full h-full object-cover" />';
+        };
+        img.onerror = () => {
+          err.textContent = "Impossible de lire cette image.";
+          err.classList.remove('hidden');
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+    })();
+  </script>
+</Layout>

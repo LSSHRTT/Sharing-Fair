@@ -56,8 +56,9 @@ const {
           <div class="container-app px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6 flex flex-wrap items-center justify-between gap-3 text-xs">
             <span>© {new Date().getFullYear()} Sharing Fair</span>
             <nav class="flex items-center gap-4">
-              <a href="/" class="hover:text-brand-200 transition-colors">Tableau de bord</a>
-              <a href="/clients" class="hover:text-brand-200 transition-colors">Clients</a>
+              <a href="/" class="hidden md:inline hover:text-brand-200 transition-colors">Tableau de bord</a>
+              <a href="/clients" class="hidden md:inline hover:text-brand-200 transition-colors">Clients</a>
+              <a href="/profil" class="md:hidden hover:text-brand-200 transition-colors">Mon profil</a>
               <a href="/logout" class="hover:text-brand-200 transition-colors">Déconnexion</a>
             </nav>
           </div>

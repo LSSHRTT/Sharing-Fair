@@ -7,9 +7,11 @@ interface Props {
   lastName: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   class?: string;
+  /** Photo de profil (data URL) — prioritaire sur les initiales si présente. */
+  src?: string | null;
 }
 
-const { firstName, lastName, size = 'md', class: className = '' } = Astro.props;
+const { firstName, lastName, size = 'md', class: className = '', src = null } = Astro.props;
 const ini = initials(firstName, lastName);
 const { bg, text } = avatarColorFor(`${firstName}${lastName}`);
 
@@ -23,13 +25,16 @@ const sizes = {
 
 <span
   class={cn(
-    'inline-flex items-center justify-center rounded-full font-semibold ring-2 ring-white shrink-0',
-    bg,
-    text,
+    'inline-flex items-center justify-center rounded-full font-semibold ring-2 ring-white shrink-0 overflow-hidden',
+    src ? '' : cn(bg, text),
     sizes[size],
     className
   )}
   aria-hidden="true"
 >
-  {ini}
+  {src ? (
+    <img src={src} alt="" loading="lazy" class="w-full h-full object-cover" />
+  ) : (
+    ini
+  )}
 </span>

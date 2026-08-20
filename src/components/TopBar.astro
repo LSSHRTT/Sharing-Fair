@@ -13,6 +13,7 @@ else if (/^\/calendrier\/\d{4}-\d{2}-\d{2}/.test(path)) title = 'Journée';
 else if (path.startsWith('/calendrier/evenement')) title = 'Événement';
 else if (path.startsWith('/calendrier')) title = 'Calendrier';
 else if (path.startsWith('/equipe')) title = 'Équipe';
+else if (path.startsWith('/profil')) title = 'Mon profil';
 
 const q = Astro.url.searchParams.get('q') ?? '';
 ---

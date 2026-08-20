@@ -1,30 +1,38 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { constantTimeEqual } from './auth';
+
 /**
  * Bénévoles & présences — Sharing Fair.
  *
- * Authentification : prénom + nom + date de naissance (mot de passe).
- * Système volontairement simple, adapté à une petite équipe interne ;
- * la date de naissance est stockée en clair en base (c'est le mot de passe).
+ * Authentification : prénom + nom + mot de passe.
+ * Par défaut, le mot de passe est la date de naissance du bénévole ;
+ * il peut la remplacer par un mot de passe libre depuis sa page Profil.
+ * Système volontairement simple, adapté à une petite équipe interne.
  */
 
 export interface Volunteer {
   id: number;
   first_name: string;
   last_name: string;
-  birth_date: string; // YYYY-MM-DD
+  birth_date: string; // YYYY-MM-DD — fait office de mot de passe tant que password = NULL
+  email: string | null;
+  phone: string | null;
+  photo: string | null;    // data URL (JPEG redimensionné côté client)
+  password: string | null; // mot de passe personnalisé (NULL = date de naissance)
   created_at: string;
 }
 
-/** Identité exposée dans Astro.locals.volunteer (jamais la date de naissance). */
+/** Identité exposée dans Astro.locals.volunteer (jamais la date de naissance ni le mot de passe). */
 export interface VolunteerIdentity {
   id: number;
   first_name: string;
   last_name: string;
+  photo: string | null;
 }
 
 export function toIdentity(v: Volunteer): VolunteerIdentity {
-  return { id: v.id, first_name: v.first_name, last_name: v.last_name };
+  return { id: v.id, first_name: v.first_name, last_name: v.last_name, photo: v.photo };
 }
 
 export type PresenceStatus = 'present' | 'maybe' | 'absent';
@@ -44,6 +52,40 @@ export interface PresenceWithName {
 }
 
 /**
+ * Normalise une date de naissance saisie : JJ/MM/AAAA, JJ-MM-AAAA, JJMMAAAA
+ * ou AAAA-MM-JJ → AAAA-MM-JJ. Retourne null si invalide (ex. 31/02/1990).
+ */
+export function parseBirthDate(raw: string): string | null {
+  const s = raw.trim();
+  let y: string, m: string, d: string;
+  let match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (match) {
+    [, y, m, d] = match;
+  } else {
+    match = /^(\d{2})[/\-. ](\d{2})[/\-. ](\d{4})$/.exec(s) ?? /^(\d{2})(\d{2})(\d{4})$/.exec(s);
+    if (!match) return null;
+    [, d, m, y] = match;
+  }
+  const iso = `${y}-${m}-${d}`;
+  const dt = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime()) || dt.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
+}
+
+/**
+ * Vérifie l'identifiant secret d'un bénévole :
+ * mot de passe personnalisé s'il en a défini un, sinon sa date de naissance
+ * (dans l'un des formats acceptés par parseBirthDate).
+ */
+export function verifyCredential(volunteer: Volunteer, candidate: string): boolean {
+  if (volunteer.password) {
+    return constantTimeEqual(volunteer.password, candidate.trim());
+  }
+  const birth = parseBirthDate(candidate);
+  return birth !== null && constantTimeEqual(volunteer.birth_date, birth);
+}
+
+/**
  * Normalisation prénom/nom : insensible à la casse, aux accents et aux
  * espaces multiples — pour qu'une saisie « elise » retrouve bien « Élise ».
  */
@@ -59,7 +101,7 @@ export function normalizeName(s: string): string {
 export async function listVolunteers(db: D1Database): Promise<Volunteer[]> {
   const res = await db
     .prepare(
-      `SELECT id, first_name, last_name, birth_date, created_at
+      `SELECT id, first_name, last_name, birth_date, email, phone, photo, password, created_at
        FROM volunteers
        ORDER BY first_name COLLATE NOCASE ASC, last_name COLLATE NOCASE ASC`,
     )
@@ -72,10 +114,53 @@ export async function getVolunteerById(
   id: number,
 ): Promise<VolunteerIdentity | null> {
   const row = await db
-    .prepare('SELECT id, first_name, last_name FROM volunteers WHERE id = ?')
+    .prepare('SELECT id, first_name, last_name, photo FROM volunteers WHERE id = ?')
     .bind(id)
     .first<VolunteerIdentity>();
   return row ?? null;
+}
+
+export async function getVolunteerFullById(
+  db: D1Database,
+  id: number,
+): Promise<Volunteer | null> {
+  const row = await db
+    .prepare(
+      'SELECT id, first_name, last_name, birth_date, email, phone, photo, password, created_at FROM volunteers WHERE id = ?',
+    )
+    .bind(id)
+    .first<Volunteer>();
+  return row ?? null;
+}
+
+/** Met à jour les coordonnées d'un bénévole (chaque champ remplacé, null = vidé). */
+export async function updateContact(
+  db: D1Database,
+  id: number,
+  fields: { email: string | null; phone: string | null },
+): Promise<void> {
+  await db
+    .prepare('UPDATE volunteers SET email = ?, phone = ? WHERE id = ?')
+    .bind(fields.email, fields.phone, id)
+    .run();
+}
+
+/** Définit la photo de profil (data URL) ou la supprime (null). */
+export async function updatePhoto(
+  db: D1Database,
+  id: number,
+  photo: string | null,
+): Promise<void> {
+  await db.prepare('UPDATE volunteers SET photo = ? WHERE id = ?').bind(photo, id).run();
+}
+
+/** Définit un mot de passe personnalisé (null → retour à la date de naissance). */
+export async function updatePassword(
+  db: D1Database,
+  id: number,
+  newPassword: string | null,
+): Promise<void> {
+  await db.prepare('UPDATE volunteers SET password = ? WHERE id = ?').bind(newPassword, id).run();
 }
 
 /** Recherche un bénévole pour la connexion (comparaison insensible aux accents). */
@@ -90,7 +175,9 @@ export async function findVolunteerForLogin(
 
   // L'équipe est petite : filtrage en mémoire, robuste aux accents/casse.
   const res = await db
-    .prepare('SELECT id, first_name, last_name, birth_date, created_at FROM volunteers')
+    .prepare(
+      'SELECT id, first_name, last_name, birth_date, email, phone, photo, password, created_at FROM volunteers',
+    )
     .all<Volunteer>();
   return (
     res.results.find(

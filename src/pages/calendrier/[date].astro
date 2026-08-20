@@ -140,7 +140,7 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
         </h2>
         <a
           href={`/calendrier/evenement/nouveau?date=${dateParam}`}
-          class="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:text-brand-800 transition-colors"
+          class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-brand-700 bg-brand-50 ring-1 ring-inset ring-brand-100 hover:bg-brand-100 hover:text-brand-800 transition-colors"
         >
           <Icon name="plus" size={13} />
           Ajouter
@@ -195,7 +195,7 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
     <!-- Ma présence -->
     <section class="surface p-5 sm:p-6 animate-slide-up">
       <div class="flex items-center gap-3 mb-4">
-        <Avatar firstName={me.first_name} lastName={me.last_name} size="md" />
+        <Avatar firstName={me.first_name} lastName={me.last_name} src={me.photo} size="md" />
         <div>
           <h2 class="text-base font-semibold text-ink-900">Ma présence</h2>
           <p class="text-sm text-ink-500">
@@ -212,7 +212,7 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
             type="submit"
             name="status"
             value={b.status}
-            class={`inline-flex items-center justify-center gap-1.5 h-11 px-2 rounded-lg border text-sm font-medium transition-all active:scale-[0.97] ${
+            class={`inline-flex items-center justify-center gap-1.5 h-12 sm:h-11 px-2 rounded-lg border text-sm font-medium transition-all active:scale-[0.97] ${
               myStatus === b.status
                 ? b.activeClass
                 : 'bg-white border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300'
@@ -254,7 +254,7 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
                 const isMe = v.id === me.id;
                 return (
                   <li class={`flex items-center gap-3 px-4 sm:px-5 py-2.5 ${isMe ? 'bg-brand-50/60' : ''}`}>
-                    <Avatar firstName={v.first_name} lastName={v.last_name} size="sm" />
+                    <Avatar firstName={v.first_name} lastName={v.last_name} src={v.photo} size="sm" />
                     <span class="text-sm font-medium text-ink-900">
                       {v.first_name} {v.last_name}
                       {isMe && <span class="text-ink-400 font-normal"> (vous)</span>}

@@ -202,14 +202,14 @@ if (tag) carryParams.tag = tag;
       </div>
 
       {allTags.length > 0 && (
-        <div class="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-ink-100">
-          <span class="text-xs text-ink-500 inline-flex items-center gap-1">
+        <div class="flex items-center gap-2 flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible mt-3 pt-3 border-t border-ink-100 -mx-1 px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span class="text-xs text-ink-500 inline-flex items-center gap-1 shrink-0">
             <Icon name="tag" size={12} />
             Filtrer :
           </span>
           <a
             href={q ? `/clients?q=${encodeURIComponent(q)}` : '/clients'}
-            class={`px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset transition-opacity ${
+            class={`shrink-0 px-2.5 py-1 text-[11px] font-medium rounded-full ring-1 ring-inset transition-opacity ${
               tag ? 'bg-white text-ink-500 ring-ink-200 hover:opacity-80' : 'bg-ink-900 text-white ring-ink-900'
             }`}
           >
@@ -218,7 +218,7 @@ if (tag) carryParams.tag = tag;
           {allTags.map((t) => (
             <a
               href={`/clients?${new URLSearchParams(q ? { q, tag: t } : { tag: t })}`}
-              class={`px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset transition-opacity ${
+              class={`shrink-0 px-2.5 py-1 text-[11px] font-medium rounded-full ring-1 ring-inset transition-opacity ${
                 tag === t
                   ? 'bg-brand-500 text-white ring-brand-500'
                   : 'bg-brand-50 text-brand-700 ring-brand-200 hover:opacity-80'

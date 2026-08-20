@@ -59,15 +59,20 @@ const items = [
     })}
   </nav>
 
-  <!-- Bénévole connecté -->
+  <!-- Bénévole connecté → accès au profil -->
   {volunteer && (
-    <div class="px-4 py-3 border-t border-ink-200/80 flex items-center gap-3">
-      <Avatar firstName={volunteer.first_name} lastName={volunteer.last_name} size="sm" />
+    <a
+      href="/profil"
+      class="px-4 py-3 border-t border-ink-200/80 flex items-center gap-3 hover:bg-brand-50/60 transition-colors group"
+      title="Mon profil"
+    >
+      <Avatar firstName={volunteer.first_name} lastName={volunteer.last_name} src={volunteer.photo} size="sm" />
       <div class="min-w-0 flex-1 leading-tight">
-        <p class="text-sm font-medium text-ink-900 truncate">{volunteer.first_name} {volunteer.last_name}</p>
-        <p class="text-[11px] text-ink-400">Bénévole</p>
+        <p class="text-sm font-medium text-ink-900 truncate group-hover:text-brand-800 transition-colors">{volunteer.first_name} {volunteer.last_name}</p>
+        <p class="text-[11px] text-ink-400">Mon profil</p>
       </div>
-    </div>
+      <Icon name="chevron-right" size={14} class="text-ink-300 group-hover:text-brand-500 group-hover:translate-x-0.5 transition-all" />
+    </a>
   )}
 
   <!-- Footer -->
