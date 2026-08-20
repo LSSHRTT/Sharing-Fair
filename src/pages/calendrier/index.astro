@@ -1,0 +1,245 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import Icon from '../../components/ui/Icon.astro';
+import { listPresencesBetween, type PresenceStatus, type PresenceWithName } from '../../lib/volunteers';
+
+const DB = Astro.locals.runtime.env.DB;
+
+// ============================================================
+// Mois affiché : ?m=YYYY-MM (défaut : mois courant, heure de Paris)
+// ============================================================
+function parisTodayParts(): { y: number; m: number; d: number; iso: string } {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const p = Object.fromEntries(fmt.formatToParts(new Date()).map((x) => [x.type, x.value]));
+  const y = Number(p.year);
+  const m = Number(p.month);
+  const d = Number(p.day);
+  return { y, m, d, iso: `${p.year}-${p.month}-${p.day}` };
+}
+
+const today = parisTodayParts();
+
+const mParam = Astro.url.searchParams.get('m') ?? '';
+const mMatch = /^(\d{4})-(\d{2})$/.exec(mParam);
+const monthValid = mMatch && Number(mMatch[2]) >= 1 && Number(mMatch[2]) <= 12;
+const year = monthValid ? Number(mMatch[1]) : today.y;
+const month = monthValid ? Number(mMatch[2]) : today.m; // 1..12
+const currentParam = `${year}-${String(month).padStart(2, '0')}`;
+
+// ============================================================
+// Grille de 6 semaines × 7 jours, semaine commençant le lundi
+// ============================================================
+const m0 = month - 1;
+const firstDow = (new Date(Date.UTC(year, m0, 1)).getUTCDay() + 6) % 7;
+const gridStart = new Date(Date.UTC(year, m0, 1 - firstDow));
+
+interface Cell {
+  iso: string;
+  day: number;
+  inMonth: boolean;
+}
+const cells: Cell[] = Array.from({ length: 42 }, (_, i) => {
+  const d = new Date(gridStart.getTime() + i * 86400000);
+  return {
+    iso: d.toISOString().slice(0, 10),
+    day: d.getUTCDate(),
+    inMonth: d.getUTCMonth() === m0,
+  };
+});
+
+// ============================================================
+// Présences de toute l'équipe sur la plage visible
+// ============================================================
+const rows = await listPresencesBetween(DB, cells[0].iso, cells[41].iso);
+const byDate = new Map<string, PresenceWithName[]>();
+for (const r of rows) {
+  const list = byDate.get(r.date);
+  if (list) list.push(r);
+  else byDate.set(r.date, [r]);
+}
+
+// Tri d'affichage : présents d'abord, puis peut-être, puis absents.
+const statusOrder: Record<PresenceStatus, number> = { present: 0, maybe: 1, absent: 2 };
+for (const list of byDate.values()) {
+  list.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+}
+
+// ============================================================
+// Libellés & navigation
+// ============================================================
+const monthLabel = new Intl.DateTimeFormat('fr-FR', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+}).format(new Date(Date.UTC(year, m0, 1)));
+
+const toParam = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+const prevParam = toParam(new Date(Date.UTC(year, m0 - 1, 1)));
+const nextParam = toParam(new Date(Date.UTC(year, m0 + 1, 1)));
+const todayParam = `${today.y}-${String(today.m).padStart(2, '0')}`;
+
+const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+const STATUS_LABEL: Record<PresenceStatus, string> = {
+  present: 'Présent',
+  maybe: 'Peut-être',
+  absent: 'Absent',
+};
+const STATUS_CHIP: Record<PresenceStatus, string> = {
+  present: 'bg-success-50 text-success-700 ring-success-100',
+  maybe: 'bg-warning-50 text-warning-700 ring-warning-100',
+  absent: 'bg-danger-50 text-danger-700 ring-danger-100',
+};
+const STATUS_DOT: Record<PresenceStatus, string> = {
+  present: 'bg-success-500',
+  maybe: 'bg-warning-500',
+  absent: 'bg-danger-500',
+};
+
+const MAX_CHIPS = 3; // pastilles nommées max par cellule (desktop)
+const MAX_DOTS = 6;  // pastilles colorées max par cellule (mobile)
+---
+
+<Layout title="Calendrier — Sharing Fair">
+  <div class="space-y-5">
+    <PageHeader
+      title="Calendrier"
+      description="Présences de l'équipe en boutique. Touchez un jour pour voir le détail et déclarer votre présence."
+    >
+      <a
+        slot="actions"
+        href={`/calendrier/${today.iso}?m=${currentParam}`}
+        class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
+      >
+        <Icon name="check" size={16} class="text-brand-600" />
+        Ma présence aujourd'hui
+      </a>
+    </PageHeader>
+
+    <div class="surface overflow-hidden animate-fade-in">
+      <!-- Barre de navigation du mois -->
+      <div class="flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b border-ink-200/80">
+        <h2 class="font-display text-xl sm:text-2xl font-semibold text-ink-900 tracking-tight capitalize">
+          {monthLabel}
+        </h2>
+        <div class="flex items-center gap-1">
+          <a
+            href={`/calendrier?m=${prevParam}`}
+            class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+            aria-label="Mois précédent"
+          >
+            <Icon name="arrow-left" size={18} />
+          </a>
+          <a
+            href={`/calendrier?m=${todayParam}`}
+            class="inline-flex items-center h-9 px-3 rounded-lg text-sm font-medium text-ink-700 hover:bg-ink-100 transition-colors"
+          >
+            Aujourd'hui
+          </a>
+          <a
+            href={`/calendrier?m=${nextParam}`}
+            class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-colors"
+            aria-label="Mois suivant"
+          >
+            <Icon name="arrow-right" size={18} />
+          </a>
+        </div>
+      </div>
+
+      <!-- En-têtes des jours -->
+      <div class="grid grid-cols-7 border-b border-ink-200/80 bg-ink-50/60">
+        {WEEKDAYS.map((d) => (
+          <div class="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <!-- Grille du mois -->
+      <div class="grid grid-cols-7">
+        {cells.map((cell, i) => {
+          const presences = byDate.get(cell.iso) ?? [];
+          const isToday = cell.iso === today.iso;
+          const isLastCol = i % 7 === 6;
+          return (
+            <a
+              href={`/calendrier/${cell.iso}?m=${currentParam}`}
+              class={[
+                'group relative min-h-[68px] sm:min-h-[104px] p-1.5 sm:p-2 flex flex-col gap-1 transition-colors border-b border-ink-100',
+                isLastCol ? '' : 'border-r',
+                cell.inMonth ? 'bg-white hover:bg-brand-50/50' : 'bg-ink-50/40 hover:bg-ink-100/40',
+              ].join(' ')}
+            >
+              <span class="flex items-center justify-center">
+                <span
+                  class={[
+                    'inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-xs sm:text-sm font-medium',
+                    isToday
+                      ? 'bg-brand-500 text-white shadow-sm font-semibold'
+                      : cell.inMonth
+                        ? 'text-ink-800 group-hover:text-brand-700'
+                        : 'text-ink-300',
+                  ].join(' ')}
+                >
+                  {cell.day}
+                </span>
+              </span>
+
+              {/* Pastilles nommées (desktop) */}
+              <span class="hidden sm:flex flex-col gap-0.5">
+                {presences.slice(0, MAX_CHIPS).map((p) => (
+                  <span
+                    title={`${p.first_name} ${p.last_name} — ${STATUS_LABEL[p.status]}`}
+                    class={`truncate px-1.5 py-0.5 rounded-md text-[10px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
+                  >
+                    {p.first_name}
+                  </span>
+                ))}
+                {presences.length > MAX_CHIPS && (
+                  <span class="px-1.5 text-[10px] font-medium text-ink-400">
+                    +{presences.length - MAX_CHIPS}
+                  </span>
+                )}
+              </span>
+
+              {/* Pastilles colorées (mobile) */}
+              <span class="flex sm:hidden flex-wrap gap-1 px-0.5">
+                {presences.slice(0, MAX_DOTS).map((p) => (
+                  <span class={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[p.status]}`} aria-hidden="true" />
+                ))}
+                {presences.length > MAX_DOTS && (
+                  <span class="text-[9px] font-medium text-ink-400 leading-none">
+                    +{presences.length - MAX_DOTS}
+                  </span>
+                )}
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+
+    <!-- Légende -->
+    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-ink-500">
+      <span class="inline-flex items-center gap-1.5">
+        <span class={`w-2.5 h-2.5 rounded-full ${STATUS_DOT.present}`} aria-hidden="true" />
+        Présent
+      </span>
+      <span class="inline-flex items-center gap-1.5">
+        <span class={`w-2.5 h-2.5 rounded-full ${STATUS_DOT.maybe}`} aria-hidden="true" />
+        Peut-être
+      </span>
+      <span class="inline-flex items-center gap-1.5">
+        <span class={`w-2.5 h-2.5 rounded-full ${STATUS_DOT.absent}`} aria-hidden="true" />
+        Absent
+      </span>
+      <span class="text-ink-400 ml-auto hidden sm:inline">Chacun déclare sa propre présence en touchant un jour.</span>
+    </div>
+  </div>
+</Layout>

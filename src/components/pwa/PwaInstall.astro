@@ -1,0 +1,133 @@
+---
+/**
+ * Moteur PWA — à inclure une fois par page (fin du <body>).
+ *
+ * 1. Enregistre le service worker (/sw.js)
+ * 2. Android / Chrome : capte `beforeinstallprompt` puis affiche
+ *    #pwa-install-btn → déclenche l'invite native d'installation
+ * 3. iOS / Safari : pas d'invite native → le bouton ouvre un guide
+ *    « Partager → Sur l'écran d'accueil »
+ * 4. App déjà installée (standalone) : le bouton reste masqué
+ */
+---
+
+<!-- Guide d'installation iOS -->
+<div
+  id="pwa-ios-modal"
+  class="fixed inset-0 z-[2000] hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="pwa-ios-title"
+>
+  <div class="fixed inset-0 bg-ink-900/40 backdrop-blur-sm animate-fade-in" data-pwa-close aria-hidden="true"></div>
+  <div class="fixed inset-0 overflow-y-auto">
+    <div class="flex min-h-full items-end sm:items-center justify-center p-4">
+      <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in">
+        <div class="flex items-center gap-3.5">
+          <img src="/logo.svg" alt="" width="48" height="48" class="w-12 h-12 rounded-full shadow-sm ring-1 ring-ink-200/60" />
+          <div>
+            <h3 id="pwa-ios-title" class="text-lg font-semibold text-ink-900 font-display">Installer Sharing Fair</h3>
+            <p class="text-sm text-ink-500 mt-0.5">Un accès direct depuis votre écran d'accueil.</p>
+          </div>
+        </div>
+
+        <ol class="mt-5 space-y-3.5 text-sm text-ink-700">
+          <li class="flex items-start gap-3">
+            <span class="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">1</span>
+            <span class="pt-0.5">
+              Appuyez sur le bouton
+              <svg class="inline-block w-4 h-4 -mt-1 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13"/><path d="m8.5 6.5 3.5-3.5 3.5 3.5"/><path d="M6 11v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-8"/></svg>
+              <strong>Partager</strong> dans Safari.
+            </span>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">2</span>
+            <span class="pt-0.5">Faites défiler puis touchez <strong>« Sur l'écran d'accueil »</strong>.</span>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold">3</span>
+            <span class="pt-0.5">Touchez <strong>Ajouter</strong> en haut à droite.</span>
+          </li>
+        </ol>
+
+        <button
+          type="button"
+          data-pwa-close
+          class="mt-6 w-full h-11 px-5 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 text-white text-sm font-medium shadow-sm hover:from-brand-600 hover:to-brand-700 transition-all active:scale-[0.98]"
+        >
+          J'ai compris
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (() => {
+    /* --- Enregistrement du service worker --- */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+
+    const btn = document.getElementById('pwa-install-btn');
+    const modal = document.getElementById('pwa-ios-modal');
+    if (!btn || !modal) return;
+
+    const isIos =
+      /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      navigator.standalone === true;
+
+    let deferredPrompt = null;
+    const showBtn = () => btn.removeAttribute('hidden');
+    const hideBtn = () => btn.setAttribute('hidden', '');
+    const openModal = () => {
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    };
+    const closeModal = () => {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    };
+
+    /* App déjà installée : rien à proposer. */
+    if (isStandalone) return;
+
+    if (isIos) {
+      /* iOS ne déclenche jamais beforeinstallprompt : on guide l'utilisateur. */
+      showBtn();
+    } else {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showBtn();
+      });
+      window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        hideBtn();
+      });
+    }
+
+    btn.addEventListener('click', async () => {
+      if (isIos || !deferredPrompt) {
+        openModal();
+        return;
+      }
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') hideBtn();
+      deferredPrompt = null;
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target.closest('[data-pwa-close]')) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+  })();
+</script>

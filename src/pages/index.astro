@@ -17,6 +17,7 @@ const [total, recent] = await Promise.all([
 
 const hour = new Date().getHours();
 const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+const me = Astro.locals.volunteer;
 ---
 
 <Layout title="Sharing Fair — Tableau de bord">
@@ -27,7 +28,9 @@ const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? '
       <div class="absolute bottom-0 left-0 w-72 h-72 bg-brand-900/30 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" aria-hidden="true"></div>
 
       <div class="relative max-w-3xl">
-        <p class="text-sm font-display italic text-brand-100 mb-2">{greeting}</p>
+        <p class="text-sm font-display italic text-brand-100 mb-2">
+          {greeting}{me ? `, ${me.first_name}` : ''} 👋
+        </p>
         <h1 class="font-display text-4xl sm:text-5xl tracking-tight mb-3">Sharing Fair</h1>
         <p class="text-brand-50/90 text-base sm:text-lg leading-relaxed mb-6 max-w-xl">
           Votre espace dédié à la gestion des clients de la boutique solidaire.
@@ -39,6 +42,13 @@ const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? '
           >
             <Icon name="plus" size={16} />
             Nouveau client
+          </a>
+          <a
+            href="/calendrier"
+            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm font-medium hover:bg-white/20 transition-all"
+          >
+            <Icon name="calendar" size={16} />
+            Calendrier de l'équipe
           </a>
           <a
             href="/clients"
@@ -86,8 +96,8 @@ const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? '
         <div class="relative flex items-start justify-between">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">Version</p>
-            <p class="font-display text-4xl text-ink-900">0.1</p>
-            <p class="text-xs text-ink-400 mt-1">MVP en cours</p>
+            <p class="font-display text-4xl text-ink-900">0.2</p>
+            <p class="text-xs text-ink-400 mt-1">PWA &amp; calendrier partagé</p>
           </div>
           <span class="w-11 h-11 rounded-xl bg-info-100 text-info-700 flex items-center justify-center shrink-0">
             <Icon name="heart" size={20} />

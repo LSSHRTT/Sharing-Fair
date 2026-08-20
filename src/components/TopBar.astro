@@ -1,5 +1,6 @@
 ---
 import Icon from './ui/Icon.astro';
+import InstallButton from './pwa/InstallButton.astro';
 
 const path = Astro.url.pathname;
 
@@ -8,6 +9,9 @@ if (path.startsWith('/clients/nouveau')) title = 'Nouveau client';
 else if (/^\/clients\/\d+\/modifier/.test(path)) title = 'Modifier le client';
 else if (/^\/clients\/\d+\/?$/.test(path)) title = 'Fiche client';
 else if (path.startsWith('/clients')) title = 'Clients';
+else if (/^\/calendrier\/\d{4}-\d{2}-\d{2}/.test(path)) title = 'Journée';
+else if (path.startsWith('/calendrier')) title = 'Calendrier';
+else if (path.startsWith('/equipe')) title = 'Équipe';
 
 const q = Astro.url.searchParams.get('q') ?? '';
 ---
@@ -42,6 +46,7 @@ const q = Astro.url.searchParams.get('q') ?? '';
 
     <!-- Right actions -->
     <div class="ml-auto lg:ml-0 flex items-center gap-2">
+      <InstallButton variant="topbar" />
       <a
         href="/clients/nouveau"
         class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 hover:shadow-md transition-all"

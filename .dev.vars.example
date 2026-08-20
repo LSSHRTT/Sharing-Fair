@@ -1,0 +1,3 @@
+# Copiez ce fichier en `.dev.vars` pour le développement local.
+# Générez une valeur aléatoire, ex. : node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+AUTH_SECRET=changez-moi-par-une-chaine-aleatoire-longue

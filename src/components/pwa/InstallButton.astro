@@ -1,0 +1,45 @@
+---
+import Icon from '../ui/Icon.astro';
+
+/**
+ * Bouton « Installer l'application » (PWA).
+ *
+ * Masqué par défaut : affiché par PwaInstall.astro uniquement
+ * - Android / Chrome : quand le navigateur propose l'installation
+ * - iOS / Safari : toujours (ouvre le guide « Sur l'écran d'accueil »)
+ * Jamais affiché si l'app est déjà installée (mode standalone).
+ *
+ * Nécessite un seul exemplaire par page + <PwaInstall /> une fois dans la page.
+ */
+interface Props {
+  variant?: 'topbar' | 'login';
+}
+
+const { variant = 'topbar' } = Astro.props;
+---
+
+{
+  variant === 'topbar' ? (
+    <button
+      id="pwa-install-btn"
+      type="button"
+      hidden
+      class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-ink-200 bg-white/80 text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 hover:text-ink-900 transition-all active:scale-[0.97]"
+      aria-label="Installer l'application sur l'écran d'accueil"
+    >
+      <Icon name="download" size={16} />
+      <span class="hidden sm:inline">Installer</span>
+    </button>
+  ) : (
+    <button
+      id="pwa-install-btn"
+      type="button"
+      hidden
+      class="inline-flex w-full items-center justify-center gap-2 h-11 px-5 rounded-lg border border-ink-200 bg-white/70 backdrop-blur-sm text-sm font-medium text-ink-700 shadow-xs hover:bg-white hover:border-ink-300 hover:text-ink-900 transition-all active:scale-[0.98]"
+      aria-label="Installer l'application sur l'écran d'accueil"
+    >
+      <Icon name="download" size={16} />
+      Installer l'application
+    </button>
+  )
+}

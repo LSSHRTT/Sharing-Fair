@@ -5,14 +5,6 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(hex.substr(i * 2, 2), 16);
-  }
-  return out;
-}
-
 async function hmac(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
@@ -25,7 +17,11 @@ async function hmac(secret: string, message: string): Promise<string> {
   return bytesToHex(new Uint8Array(sig));
 }
 
-function constantTimeEqual(a: string, b: string): boolean {
+/**
+ * Comparaison en temps constant — utilisée pour vérifier la signature de
+ * session ainsi que la date de naissance (qui fait office de mot de passe).
+ */
+export function constantTimeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let mismatch = 0;
   for (let i = 0; i < a.length; i++) {
@@ -34,35 +30,39 @@ function constantTimeEqual(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
-export async function passwordMatches(input: string, expected: string): Promise<boolean> {
-  if (!expected) return false;
-  if (input.length !== expected.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < input.length; i++) {
-    mismatch |= input.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
-export async function createSessionToken(secret: string): Promise<string> {
+/** Crée un jeton de session signé, lié à un bénévole (son id). */
+export async function createSessionToken(secret: string, volunteerId: number): Promise<string> {
   const issued = Date.now().toString(36);
   const nonce = bytesToHex(crypto.getRandomValues(new Uint8Array(8)));
-  const payload = `${issued}.${nonce}`;
+  const payload = `${issued}.${volunteerId}.${nonce}`;
   const sig = await hmac(secret, payload);
   return `${payload}.${sig}`;
 }
 
-export async function verifySessionToken(token: string | undefined, secret: string): Promise<boolean> {
-  if (!token || !secret) return false;
+/**
+ * Vérifie un jeton de session. Retourne l'id du bénévole si le jeton est
+ * valide et non expiré, sinon null.
+ */
+export async function verifySessionToken(
+  token: string | undefined,
+  secret: string,
+): Promise<number | null> {
+  if (!token || !secret) return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return false;
-  const [issued, nonce, sig] = parts;
-  const expected = await hmac(secret, `${issued}.${nonce}`);
-  if (!constantTimeEqual(sig, expected)) return false;
+  if (parts.length !== 4) return null;
+  const [issued, idStr, nonce, sig] = parts;
+  const volunteerId = Number(idStr);
+  if (!Number.isInteger(volunteerId) || volunteerId <= 0) return null;
+
+  const expected = await hmac(secret, `${issued}.${idStr}.${nonce}`);
+  if (!constantTimeEqual(sig, expected)) return null;
+
   const issuedAt = parseInt(issued, 36);
-  if (!Number.isFinite(issuedAt)) return false;
+  if (!Number.isFinite(issuedAt)) return null;
   const ageSec = (Date.now() - issuedAt) / 1000;
-  return ageSec >= 0 && ageSec < COOKIE_MAX_AGE;
+  if (ageSec < 0 || ageSec >= COOKIE_MAX_AGE) return null;
+
+  return volunteerId;
 }
 
 export function sessionCookieName(): string {

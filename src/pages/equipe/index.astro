@@ -1,0 +1,161 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '../../components/ui/PageHeader.astro';
+import Avatar from '../../components/ui/Avatar.astro';
+import Button from '../../components/ui/Button.astro';
+import Input from '../../components/ui/Input.astro';
+import Field from '../../components/ui/Field.astro';
+import Icon from '../../components/ui/Icon.astro';
+import ToastAnimated from '../../components/ui/ToastAnimated.astro';
+import { createVolunteer, listVolunteers } from '../../lib/volunteers';
+import { formatDate } from '../../lib/format';
+
+const DB = Astro.locals.runtime.env.DB;
+const me = Astro.locals.volunteer!;
+
+// ============================================================
+// Ajout d'un bénévole (toute personne connectée peut inscrire
+// un nouveau membre de l'équipe — outil interne de confiance)
+// ============================================================
+let errorKey: 'champs' | 'doublon' | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const firstName = String(form.get('first_name') ?? '').trim();
+  const lastName = String(form.get('last_name') ?? '').trim();
+  const birthDate = String(form.get('birth_date') ?? '').trim();
+
+  const year = /^\d{4}/.test(birthDate) ? Number(birthDate.slice(0, 4)) : 0;
+  const valid =
+    firstName.length > 0 && firstName.length <= 80 &&
+    lastName.length > 0 && lastName.length <= 80 &&
+    /^\d{4}-\d{2}-\d{2}$/.test(birthDate) &&
+    year >= 1900 && year <= new Date().getUTCFullYear();
+
+  if (!valid) {
+    errorKey = 'champs';
+  } else {
+    const result = await createVolunteer(DB, {
+      first_name: firstName,
+      last_name: lastName,
+      birth_date: birthDate,
+    });
+    if (!result.ok) {
+      errorKey = 'doublon';
+    } else {
+      return Astro.redirect('/equipe?ok=ajoute', 303);
+    }
+  }
+}
+
+const volunteers = await listVolunteers(DB);
+
+// --- Retours d'action ---
+const ok = Astro.url.searchParams.get('ok');
+const errParam = Astro.url.searchParams.get('err');
+const errorMessages: Record<string, string> = {
+  champs: 'Renseignez le prénom, le nom et une date de naissance valide.',
+  doublon: 'Ce bénévole existe déjà (même prénom et même nom).',
+  introuvable: "Ce bénévole n'existe plus.",
+};
+const error = errorMessages[errorKey ?? errParam ?? ''] ?? null;
+const toast =
+  ok === 'ajoute'
+    ? 'Bénévole ajouté à l\'équipe ✅'
+    : ok === 'supprime'
+      ? 'Bénévole retiré de l\'équipe.'
+      : null;
+---
+
+<Layout title="Équipe — Sharing Fair">
+  <div class="max-w-3xl mx-auto space-y-6">
+    <PageHeader
+      title="Équipe"
+      description={`${volunteers.length} bénévole${volunteers.length > 1 ? 's' : ''}. Chaque bénévole se connecte avec son prénom, son nom et sa date de naissance.`}
+    />
+
+    {toast && <ToastAnimated type="success" message={toast} />}
+    {error && <ToastAnimated type="danger" message={error} />}
+
+    <!-- Ajout d'un bénévole -->
+    <section class="surface p-5 sm:p-6 animate-slide-up">
+      <h2 class="text-base font-semibold text-ink-900 flex items-center gap-2 mb-1">
+        <Icon name="plus" size={16} class="text-brand-600" />
+        Ajouter un bénévole
+      </h2>
+      <p class="text-sm text-ink-500 mb-5">
+        La date de naissance sert de mot de passe : communiquez-la uniquement à la personne concernée.
+        Elle n'est jamais affichée dans l'application.
+      </p>
+
+      <form method="POST" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Field label="Prénom" required for="first_name">
+          <Input id="first_name" name="first_name" type="text" required autocomplete="off" placeholder="Ex. Élise" />
+        </Field>
+        <Field label="Nom" required for="last_name">
+          <Input id="last_name" name="last_name" type="text" required autocomplete="off" placeholder="Ex. Rousseau" />
+        </Field>
+        <Field label="Date de naissance" required for="birth_date">
+          <Input id="birth_date" name="birth_date" type="date" required min="1900-01-01" max="2015-12-31" />
+        </Field>
+        <div class="sm:col-span-3">
+          <Button type="submit" variant="primary">
+            <Icon name="plus" size={16} />
+            Ajouter à l'équipe
+          </Button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Liste des bénévoles -->
+    <section class="surface overflow-hidden animate-slide-up" style="animation-delay: 0.08s">
+      <div class="px-4 sm:px-5 py-3 border-b border-ink-100 bg-ink-50/50 flex items-center gap-2">
+        <Icon name="heart" size={16} class="text-brand-600" />
+        <h3 class="text-sm font-semibold text-ink-800">Membres de l'équipe</h3>
+      </div>
+      <ul class="divide-y divide-ink-100">
+        {volunteers.map((v) => {
+          const isMe = v.id === me.id;
+          return (
+            <li class={`flex items-center gap-3 px-4 sm:px-5 py-3 ${isMe ? 'bg-brand-50/60' : ''}`}>
+              <Avatar firstName={v.first_name} lastName={v.last_name} size="md" />
+              <div class="min-w-0 flex-1 leading-tight">
+                <p class="text-sm font-medium text-ink-900 truncate">
+                  {v.first_name} {v.last_name}
+                  {isMe && <span class="text-ink-400 font-normal"> (vous)</span>}
+                </p>
+                <p class="text-[11px] text-ink-400 mt-0.5">Dans l'équipe depuis le {formatDate(v.created_at)}</p>
+              </div>
+              <form
+                method="POST"
+                action={`/equipe/${v.id}/supprimer`}
+                data-confirm={`Retirer ${v.first_name} ${v.last_name} de l'équipe ?${isMe ? ' Il s\'agit de votre propre compte : vous serez déconnecté.' : ''} Ses présences seront effacées.`}
+              >
+                <button
+                  type="submit"
+                  class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
+                  aria-label={`Retirer ${v.first_name} ${v.last_name}`}
+                >
+                  <Icon name="trash" size={16} />
+                </button>
+              </form>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+
+    <p class="text-xs text-ink-400 text-center">
+      ⚠️ Au moins un bénévole doit exister pour pouvoir se connecter à l'application.
+    </p>
+  </div>
+
+  <script is:inline>
+    // Confirmation avant suppression d'un bénévole (source fiable : un clic).
+    document.querySelectorAll('form[data-confirm]').forEach((f) => {
+      f.addEventListener('submit', (e) => {
+        if (!window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+      });
+    });
+  </script>
+</Layout>

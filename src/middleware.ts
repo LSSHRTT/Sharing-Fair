@@ -1,8 +1,21 @@
 import { defineMiddleware } from 'astro:middleware';
 import { sessionCookieName, verifySessionToken } from './lib/auth';
+import { getVolunteerById } from './lib/volunteers';
 
 const PUBLIC_PATHS = new Set(['/login']);
-const PUBLIC_PREFIXES = ['/_astro/', '/favicon', '/api/', '/assets/'];
+const PUBLIC_PREFIXES = [
+  '/_astro/',
+  '/favicon',
+  '/api/',
+  '/assets/',
+  // PWA : manifest, service worker, icônes et page hors-ligne
+  // doivent être accessibles sans session (installation sur l'écran d'accueil).
+  '/manifest.webmanifest',
+  '/sw.js',
+  '/offline.html',
+  '/icons/',
+  '/logo.svg',
+];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -18,13 +31,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const env = (locals as any).runtime?.env as Env | undefined;
   const secret = env?.AUTH_SECRET ?? '';
+  const db = env?.DB;
   const token = cookies.get(sessionCookieName())?.value;
-  const ok = await verifySessionToken(token, secret);
+  const volunteerId = await verifySessionToken(token, secret);
 
-  if (!ok) {
+  // Jeton valide → on recharge le bénévole (il a pu être supprimé de l'équipe).
+  const volunteer = volunteerId && db ? await getVolunteerById(db, volunteerId) : null;
+
+  if (!volunteer) {
+    if (token) cookies.delete(sessionCookieName(), { path: '/' });
     const next_ = url.pathname + url.search;
     return redirect(`/login?next=${encodeURIComponent(next_)}`, 302);
   }
 
+  locals.volunteer = volunteer;
   return next();
 });

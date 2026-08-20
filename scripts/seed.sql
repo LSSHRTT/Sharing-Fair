@@ -1,0 +1,41 @@
+-- Données de démonstration — DÉVELOPPEMENT LOCAL UNIQUEMENT.
+-- Exécuté via : npm run db:seed:local
+-- ⚠️ Ne jamais exécuter sur la base distante : ce fichier vide les tables.
+
+DELETE FROM clients;
+
+INSERT INTO clients (first_name, last_name, email, phone, address_line1, postal_code, city, country, birth_date, preferences, tags, notes, created_at, updated_at) VALUES
+  ('Marie',   'Dupont',    'marie.dupont@example.com',    '0612345678', '12 rue des Lilas',     '75011', 'Paris',     'France', '1988-04-12', 'Préfère les produits bio',            '["VIP","Newsletter"]',     'Cliente fidèle depuis 2022',           '2026-01-15T10:23:00Z', '2026-06-20T14:11:00Z'),
+  ('Jean',    'Martin',    'jean.martin@example.com',     '0623456789', '5 avenue Victor Hugo', '69001', 'Lyon',      'France', '1975-11-30', 'Allergique au gluten',                 '["Newsletter"]',           NULL,                                    '2026-02-03T09:15:00Z', '2026-02-03T09:15:00Z'),
+  ('Sophie',  'Bernard',   'sophie.b@example.com',        '0634567890', '8 place Bellecour',    '69002', 'Lyon',      'France', '1992-07-22', NULL,                                   '["VIP"]',                  'Demande à être prévenue des nouveautés','2026-03-12T16:42:00Z', '2026-05-08T11:30:00Z'),
+  ('Pierre',  'Lefebvre',  'p.lefebvre@example.com',      '0645678901', '23 boulevard Haussmann','75008','Paris',     'France', '1980-02-14', 'Aime les pièces vintage',              '["Collectionneur"]',       NULL,                                    '2026-03-28T13:05:00Z', '2026-03-28T13:05:00Z'),
+  ('Lucie',   'Moreau',    'lucie.moreau@example.com',    '0656789012', '14 rue de la République','13001','Marseille','France', '1995-09-08', NULL,                                   '["Newsletter","Étudiant"]', NULL,                                    '2026-04-05T08:50:00Z', '2026-04-05T08:50:00Z'),
+  ('Thomas',  'Garcia',    'thomas.garcia@example.com',   '0667890123', '7 cours Mirabeau',     '13100', 'Aix-en-Provence','France','1985-06-17','Cherche des cadeaux régulièrement',  '["VIP","Famille"]',        'Père de 2 enfants',                     '2026-04-18T15:20:00Z', '2026-06-01T10:00:00Z'),
+  ('Camille', 'Roux',      NULL,                          '0678901234', NULL,                    NULL,    'Bordeaux',  'France', NULL,         NULL,                                   '[]',                       'Première visite, contact téléphonique','2026-05-02T11:45:00Z', '2026-05-02T11:45:00Z'),
+  ('Antoine', 'Petit',     'antoine.petit@example.com',   '0689012345', '3 rue Sainte-Catherine','33000','Bordeaux',   'France', '1970-12-03', 'Préfère le contact en boutique',       '["VIP"]',                  NULL,                                    '2026-05-14T14:30:00Z', '2026-05-14T14:30:00Z'),
+  ('Élise',   'Rousseau',  'elise.rousseau@example.com',  '0690123456', '19 rue du Faubourg',   '67000', 'Strasbourg','France', '1990-03-25', 'Sensible aux matières naturelles',     '["Newsletter","Bio"]',     NULL,                                    '2026-05-29T17:12:00Z', '2026-06-15T09:22:00Z'),
+  ('Maxime',  'Fournier',  'max.fournier@example.com',    '0701234567', '11 quai des Belges',   '13007', 'Marseille', 'France', '1982-08-11', NULL,                                   '["Collectionneur","VIP"]', 'S''intéresse aux éditions limitées',     '2026-06-08T12:18:00Z', '2026-06-08T12:18:00Z'),
+  ('Inès',    'Lambert',   'ines.lambert@example.com',    '0712345678', '6 rue Mercière',       '69002', 'Lyon',      'France', '1998-01-19', NULL,                                   '["Newsletter","Étudiant"]', NULL,                                    '2026-06-19T10:05:00Z', '2026-06-19T10:05:00Z'),
+  ('Hugo',    'Faure',     'hugo.faure@example.com',      '0723456789', '2 place Saint-Michel', '75005', 'Paris',     'France', '1987-05-04', 'Cadeaux d''entreprise',                '["Pro","VIP"]',            'Gère une PME, achats récurrents',       '2026-06-25T15:40:00Z', '2026-06-28T09:00:00Z');
+
+-- ============================================================
+-- Bénévoles de démonstration
+-- Mot de passe = date de naissance (ex. connexion : Élise Rousseau / 1990-03-25)
+-- ============================================================
+DELETE FROM presences;
+DELETE FROM volunteers;
+
+INSERT INTO volunteers (id, first_name, last_name, birth_date, created_at) VALUES
+  (1, 'Élise',   'Rousseau',  '1990-03-25', '2026-08-01T09:00:00Z'),
+  (2, 'Hugo',    'Faure',     '1987-05-04', '2026-08-01T09:00:00Z'),
+  (3, 'Camille', 'Roux',      '1998-11-14', '2026-08-01T09:00:00Z');
+
+DELETE FROM sqlite_sequence WHERE name = 'volunteers';
+
+-- Quelques présences d'exemple au mois courant (août 2026)
+INSERT INTO presences (volunteer_id, date, status, updated_at) VALUES
+  (1, '2026-08-20', 'present', '2026-08-19T18:00:00Z'),
+  (2, '2026-08-20', 'maybe',   '2026-08-19T18:05:00Z'),
+  (1, '2026-08-21', 'present', '2026-08-19T18:00:00Z'),
+  (3, '2026-08-21', 'absent',  '2026-08-19T18:10:00Z'),
+  (2, '2026-08-22', 'present', '2026-08-19T18:05:00Z');

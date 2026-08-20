@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Sidebar from '../components/Sidebar.astro';
 import TopBar from '../components/TopBar.astro';
+import PwaInstall from '../components/pwa/PwaInstall.astro';
 
 interface Props {
   title?: string;
@@ -23,6 +24,14 @@ const {
     <meta name="theme-color" content="#C65D3A" />
     <meta name="color-scheme" content="light" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+
+    <!-- PWA : installation sur l'écran d'accueil (Android & iOS) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Sharing Fair" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 
     <link rel="preconnect" href="https://rsms.me" crossorigin />
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
@@ -54,5 +63,6 @@ const {
         </footer>
       </div>
     </div>
+    <PwaInstall />
   </body>
 </html>

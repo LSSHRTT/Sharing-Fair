@@ -1,14 +1,19 @@
 ---
 import Icon from './ui/Icon.astro';
+import Avatar from './ui/Avatar.astro';
 import { cn } from '../lib/cn';
 
 const path = Astro.url.pathname;
 const isActive = (href: string) =>
   href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`);
 
+const volunteer = Astro.locals.volunteer;
+
 const items = [
   { href: '/', label: 'Tableau de bord', icon: 'dashboard' as const },
+  { href: '/calendrier', label: 'Calendrier', icon: 'calendar' as const },
   { href: '/clients', label: 'Clients', icon: 'users' as const },
+  { href: '/equipe', label: 'Équipe', icon: 'heart' as const },
 ];
 ---
 
@@ -53,9 +58,20 @@ const items = [
     })}
   </nav>
 
+  <!-- Bénévole connecté -->
+  {volunteer && (
+    <div class="px-4 py-3 border-t border-ink-200/80 flex items-center gap-3">
+      <Avatar firstName={volunteer.first_name} lastName={volunteer.last_name} size="sm" />
+      <div class="min-w-0 flex-1 leading-tight">
+        <p class="text-sm font-medium text-ink-900 truncate">{volunteer.first_name} {volunteer.last_name}</p>
+        <p class="text-[11px] text-ink-400">Bénévole</p>
+      </div>
+    </div>
+  )}
+
   <!-- Footer -->
   <div class="px-4 py-4 border-t border-ink-200/80 flex items-center justify-between text-[11px] text-ink-400">
-    <span class="font-medium">v0.1.0</span>
+    <span class="font-medium">v0.2.0</span>
     <a href="/logout" class="inline-flex items-center gap-1 hover:text-brand-700 transition-colors font-medium">
       <Icon name="arrow-right" size={12} />
       Déconnexion
