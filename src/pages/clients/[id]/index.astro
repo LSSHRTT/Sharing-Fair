@@ -17,6 +17,8 @@ if (!Number.isInteger(clientId) || clientId <= 0) {
 
 const DB = Astro.locals.runtime.env.DB;
 const client = await getClient(DB, clientId);
+// Modification / suppression : réservées au gérant.
+const isGerant = Astro.locals.volunteer?.role === 'gerant';
 
 if (!client) {
   return new Response(null, { status: 404 });
@@ -32,14 +34,18 @@ if (!client) {
         { label: fullName(client) },
       ]}
     >
-      <Button slot="actions" href={`/clients/${client.id}/modifier`} variant="outline" class="flex-1 sm:flex-none justify-center">
-        <Icon name="edit" size={16} />
-        Modifier
-      </Button>
-      <Button slot="actions" variant="danger" data-open-modal="delete-confirm" class="flex-1 sm:flex-none justify-center">
-        <Icon name="trash" size={16} />
-        Supprimer
-      </Button>
+      {isGerant && (
+        <Button slot="actions" href={`/clients/${client.id}/modifier`} variant="outline" class="flex-1 sm:flex-none justify-center">
+          <Icon name="edit" size={16} />
+          Modifier
+        </Button>
+      )}
+      {isGerant && (
+        <Button slot="actions" variant="danger" data-open-modal="delete-confirm" class="flex-1 sm:flex-none justify-center">
+          <Icon name="trash" size={16} />
+          Supprimer
+        </Button>
+      )}
     </PageHeader>
 
     <!-- Header card with avatar & contact -->
@@ -95,7 +101,8 @@ if (!client) {
     </div>
   </div>
 
-  <!-- Delete confirmation modal -->
+  {/* Delete confirmation modal — rendue uniquement pour le gérant */}
+  {isGerant && (
   <div
     id="delete-confirm"
     class="fixed inset-0 z-[1000] hidden"
@@ -134,12 +141,14 @@ if (!client) {
               >
                 Supprimer définitivement
               </button>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
+  )}
 </Layout>
 
 <script is:inline>

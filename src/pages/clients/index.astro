@@ -11,6 +11,8 @@ import { fullName } from '../../lib/format';
 import { listClients, listDistinctTags } from '../../../functions/api/lib/db';
 
 const DB = Astro.locals.runtime.env.DB;
+// Création / envois groupés / suppression : réservés au gérant.
+const isGerant = Astro.locals.volunteer?.role === 'gerant';
 
 const q = Astro.url.searchParams.get('q')?.trim() || '';
 const tag = Astro.url.searchParams.get('tag')?.trim() || '';
@@ -55,14 +57,18 @@ if (tag) carryParams.tag = tag;
       <span slot="actions" class="text-sm text-ink-500 self-center">
         <strong class="font-display text-lg text-ink-900">{total}</strong> {total > 1 ? 'fiches' : 'fiche'}
       </span>
-      <Button slot="actions" variant="secondary" id="open-email-modal">
-        <Icon name="mail" size={16} />
-        Envoyer un mail
-      </Button>
-      <Button slot="actions" href="/clients/nouveau" variant="primary">
-        <Icon name="plus" size={16} />
-        Nouveau client
-      </Button>
+      {isGerant && (
+        <Button slot="actions" variant="secondary" id="open-email-modal">
+          <Icon name="mail" size={16} />
+          Envoyer un mail
+        </Button>
+      )}
+      {isGerant && (
+        <Button slot="actions" href="/clients/nouveau" variant="primary">
+          <Icon name="plus" size={16} />
+          Nouveau client
+        </Button>
+      )}
     </PageHeader>
 
     <!-- Modale d'envoi groupé -->
@@ -248,7 +254,7 @@ if (tag) carryParams.tag = tag;
           : 'Créez votre première fiche client pour commencer.'}
       >
         <Icon slot="icon" name="users" size={24} />
-        {!q && !tag && (
+        {!q && !tag && isGerant && (
           <Button slot="actions" href="/clients/nouveau" variant="primary">
             <Icon name="plus" size={16} />
             Créer le premier client
@@ -442,7 +448,8 @@ function closeModal() {
 // ============================================================
 // Événements
 // ============================================================
-document.getElementById('open-email-modal').addEventListener('click', openModal);
+const openEmailBtn = document.getElementById('open-email-modal');
+if (openEmailBtn) openEmailBtn.addEventListener('click', openModal);
 document.getElementById('toolbar-open-modal').addEventListener('click', openModal);
 document.getElementById('modal-close-btn').addEventListener('click', closeModal);
 

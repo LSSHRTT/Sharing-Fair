@@ -8,6 +8,11 @@ import { createClient } from '../../../functions/api/lib/db';
 
 const DB = Astro.locals.runtime.env.DB;
 
+// Création de client : réservée au gérant.
+if (Astro.locals.volunteer?.role !== 'gerant') {
+  return Astro.redirect('/?err=acces', 302);
+}
+
 let serverError: string | null = null;
 let fieldErrors: Record<string, string[]> | null = null;
 

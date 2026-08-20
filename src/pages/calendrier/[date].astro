@@ -85,6 +85,9 @@ for (const v of volunteers) {
 
 const myStatus = statusByVolunteer.get(me.id) ?? null;
 
+// Edition des événements : réservée au gérant.
+const isGerant = me.role === 'gerant';
+
 const dateLabelRaw = new Intl.DateTimeFormat('fr-FR', {
   weekday: 'long',
   day: 'numeric',
@@ -139,13 +142,15 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
           <Icon name="calendar" size={15} class="text-brand-600" />
           {dayEvents.length > 0 ? `${dayEvents.length} événement${dayEvents.length > 1 ? 's' : ''} ce jour` : 'Aucun événement ce jour'}
         </h2>
-        <a
-          href={`/calendrier/evenement/nouveau?date=${dateParam}`}
-          class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-brand-700 bg-brand-50 ring-1 ring-inset ring-brand-100 hover:bg-brand-100 hover:text-brand-800 transition-colors"
-        >
-          <Icon name="plus" size={13} />
-          Ajouter
-        </a>
+        {isGerant && (
+          <a
+            href={`/calendrier/evenement/nouveau?date=${dateParam}`}
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-brand-700 bg-brand-50 ring-1 ring-inset ring-brand-100 hover:bg-brand-100 hover:text-brand-800 transition-colors"
+          >
+            <Icon name="plus" size={13} />
+            Ajouter
+          </a>
+        )}
       </div>
 
       {dayEvents.map((e) => (
@@ -157,13 +162,15 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
                 <p class="text-xs text-brand-700 font-medium capitalize mt-0.5">{formatEventDateRange(e)}</p>
               )}
             </div>
-            <a
-              href={`/calendrier/evenement/${e.id}`}
-              class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-brand-700 hover:bg-brand-50 transition-colors shrink-0"
-              aria-label={`Modifier ${e.title}`}
-            >
-              <Icon name="edit" size={16} />
-            </a>
+            {isGerant && (
+              <a
+                href={`/calendrier/evenement/${e.id}`}
+                class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-brand-700 hover:bg-brand-50 transition-colors shrink-0"
+                aria-label={`Modifier ${e.title}`}
+              >
+                <Icon name="edit" size={16} />
+              </a>
+            )}
           </div>
 
           {e.hours && (

@@ -10,6 +10,11 @@ import { fullName } from '../../../lib/format';
 const { id } = Astro.params;
 const clientId = Number(id);
 
+// Modification de fiche : réservée au gérant.
+if (Astro.locals.volunteer?.role !== 'gerant') {
+  return Astro.redirect('/?err=acces', 302);
+}
+
 if (!Number.isInteger(clientId) || clientId <= 0) {
   return new Response('ID invalide', { status: 400 });
 }

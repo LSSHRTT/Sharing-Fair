@@ -22,7 +22,8 @@ const q = Astro.url.searchParams.get('q') ?? '';
 
 const me = Astro.locals.volunteer;
 const unread = me ? await countUnread(Astro.locals.runtime.env.DB, me.id) : 0;
-const canClients = me ? canAccess(me, 'clients') : false;
+// Création de client : réservée au gérant (les bénévoles consultent les fiches).
+const canCreateClient = me?.role === 'gerant';
 ---
 
 <header class="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-ink-200">
@@ -64,7 +65,7 @@ const canClients = me ? canAccess(me, 'clients') : false;
         )}
       </a>
       <InstallButton variant="topbar" />
-      {canClients && (
+      {canCreateClient && (
         <a
           href="/clients/nouveau"
           class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 hover:shadow-md transition-all"

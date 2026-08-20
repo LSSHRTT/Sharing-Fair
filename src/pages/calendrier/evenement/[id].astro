@@ -8,6 +8,12 @@ import EventForm from '../../../components/events/EventForm.astro';
 import { getEvent, updateEvent, isValidIsoDate } from '../../../lib/events';
 
 const DB = Astro.locals.runtime.env.DB;
+
+// Modification d'événement : réservée au gérant.
+if (Astro.locals.volunteer?.role !== 'gerant') {
+  return Astro.redirect('/?err=acces', 302);
+}
+
 const id = Number(Astro.params.id);
 if (!Number.isInteger(id) || id <= 0) {
   return Astro.redirect('/calendrier', 302);

@@ -3,9 +3,11 @@ import Layout from '../../../layouts/Layout.astro';
 import PageHeader from '../../../components/ui/PageHeader.astro';
 import Avatar from '../../../components/ui/Avatar.astro';
 import Button from '../../../components/ui/Button.astro';
+import Input from '../../../components/ui/Input.astro';
+import Field from '../../../components/ui/Field.astro';
 import Icon from '../../../components/ui/Icon.astro';
 import ToastAnimated from '../../../components/ui/ToastAnimated.astro';
-import { getVolunteerFullById, updatePermissions } from '../../../lib/volunteers';
+import { getVolunteerFullById, updatePermissions, updatePassword } from '../../../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
 const me = Astro.locals.volunteer!;
@@ -30,23 +32,50 @@ let error: string | null = null;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
-  const role = form.get('role') === 'gerant' ? 'gerant' : 'benevole';
-  const accessCalendrier = form.get('access_calendrier') === 'on' ? 1 : 0;
-  const accessClients = form.get('access_clients') === 'on' ? 1 : 0;
-  const accessEquipe = form.get('access_equipe') === 'on' ? 1 : 0;
+  // Le bouton « Réinitialiser » prime le champ caché « action ».
+  const action = form.has('reset_mdp') ? 'reset_password' : String(form.get('action') ?? 'perms');
 
-  if (isSelf && role !== 'gerant') {
-    error = 'Vous ne pouvez pas retirer votre propre rôle de gérant (verrouillage du compte).';
+  if (action === 'password') {
+    // Le gérant définit un nouveau mot de passe pour ce bénévole.
+    const fresh = String(form.get('new_password') ?? '').trim();
+    if (fresh.length < 6 || fresh.length > 64) {
+      error = 'Le mot de passe doit contenir entre 6 et 64 caractères.';
+    } else {
+      await updatePassword(DB, id, fresh);
+      return Astro.redirect(`/equipe/${id}?ok=mdp`, 303);
+    }
+  } else if (action === 'reset_password') {
+    // Retour au mot de passe par défaut : date de naissance.
+    await updatePassword(DB, id, null);
+    return Astro.redirect(`/equipe/${id}?ok=reset`, 303);
   } else {
-    await updatePermissions(DB, id, {
-      role: isSelf ? 'gerant' : role,
-      access_calendrier: accessCalendrier,
-      access_clients: accessClients,
-      access_equipe: accessEquipe,
-    });
-    return Astro.redirect('/equipe?ok=perms', 303);
+    const role = form.get('role') === 'gerant' ? 'gerant' : 'benevole';
+    const accessCalendrier = form.get('access_calendrier') === 'on' ? 1 : 0;
+    const accessClients = form.get('access_clients') === 'on' ? 1 : 0;
+    const accessEquipe = form.get('access_equipe') === 'on' ? 1 : 0;
+
+    if (isSelf && role !== 'gerant') {
+      error = 'Vous ne pouvez pas retirer votre propre rôle de gérant (verrouillage du compte).';
+    } else {
+      await updatePermissions(DB, id, {
+        role: isSelf ? 'gerant' : role,
+        access_calendrier: accessCalendrier,
+        access_clients: accessClients,
+        access_equipe: accessEquipe,
+      });
+      return Astro.redirect('/equipe?ok=perms', 303);
+    }
   }
 }
+
+// Retours d'action
+const ok = Astro.url.searchParams.get('ok');
+const toasts: Record<string, string> = {
+  mdp: `Mot de passe de ${target.first_name} ${target.last_name} changé ✅ — communiquez-le-lui personnellement.`,
+  reset: `Mot de passe de ${target.first_name} ${target.last_name} réinitialisé : sa date de naissance sert à nouveau de mot de passe.`,
+};
+const toast = ok ? toasts[ok] : null;
+const hasCustomPassword = !!target.password;
 
 const TABS = [
   { key: 'access_calendrier', label: 'Calendrier', icon: 'calendar' as const, desc: 'Ventes, événements et présences.' },
@@ -65,6 +94,7 @@ const TABS = [
       ]}
     />
 
+    {toast && <ToastAnimated type="success" message={toast} />}
     {error && <ToastAnimated type="danger" message={error} />}
 
     <section class="surface p-5 sm:p-6 animate-slide-up">
@@ -135,5 +165,56 @@ const TABS = [
         </div>
       </form>
     </section>
+
+    {/* Mot de passe du bénévole (géré par le gérant ; le sien se change via Mon profil) */}
+    {!isSelf && (
+    <section class="surface p-5 sm:p-6 animate-slide-up" style="animation-delay: 0.06s">
+      <h2 class="text-base font-semibold text-ink-900 mb-1 flex items-center gap-2">
+        <Icon name="shield" size={16} class="text-brand-600" />
+        Mot de passe
+      </h2>
+      <p class="text-sm text-ink-500 mb-4">
+        {hasCustomPassword
+          ? `${target.first_name} utilise un mot de passe personnalisé.`
+          : `${target.first_name} se connecte avec sa date de naissance (JJ/MM/AAAA).`}
+      </p>
+
+      <form method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="password" />
+        <Field label="Nouveau mot de passe" required for="new_password">
+          <Input
+            id="new_password"
+            name="new_password"
+            type="text"
+            required
+            minlength={6}
+            maxlength={64}
+            autocomplete="off"
+            placeholder="Ex. boutique2026"
+          />
+        </Field>
+        <div class="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="secondary" class="flex-1 sm:flex-none justify-center">
+            <Icon name="check" size={16} />
+            Définir ce mot de passe
+          </Button>
+          {hasCustomPassword && (
+            <button
+              type="submit"
+              name="reset_mdp"
+              value="1"
+              class="text-xs font-medium text-ink-400 hover:text-danger-600 underline underline-offset-2 transition-colors"
+            >
+              Réinitialiser (date de naissance)
+            </button>
+          )}
+        </div>
+        <p class="text-xs text-ink-400 leading-relaxed">
+          Le mot de passe est affiché en clair pour que vous puissiez le communiquer à la personne
+          (de vive voix, jamais par groupe). Sa session active reste valide jusqu'à son expiration.
+        </p>
+      </form>
+    </section>
+    )}
   </div>
 </Layout>

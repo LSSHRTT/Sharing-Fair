@@ -20,6 +20,9 @@ const hour = new Date().getHours();
 const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 const me = Astro.locals.volunteer;
 const accessDenied = Astro.url.searchParams.get('err') === 'acces';
+const isGerant = me?.role === 'gerant';
+const canClients = !!me && (isGerant || me.access_clients === 1);
+const canCalendrier = !!me && (isGerant || me.access_calendrier === 1);
 ---
 
 <Layout title="Sharing Fair — Tableau de bord">
@@ -42,27 +45,33 @@ const accessDenied = Astro.url.searchParams.get('err') === 'acces';
           Votre espace dédié à la gestion des clients de la boutique solidaire.
         </p>
         <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2.5 sm:gap-3">
-          <a
-            href="/clients/nouveau"
-            class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white text-brand-700 text-sm font-semibold shadow-md hover:shadow-lg hover:-translate-y-px transition-all"
-          >
-            <Icon name="plus" size={16} />
-            Nouveau client
-          </a>
-          <a
-            href="/calendrier"
-            class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm font-medium hover:bg-white/20 transition-all active:bg-white/25"
-          >
-            <Icon name="calendar" size={16} />
-            Calendrier de l'équipe
-          </a>
-          <a
-            href="/clients"
-            class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm font-medium hover:bg-white/20 transition-all active:bg-white/25"
-          >
-            <Icon name="users" size={16} />
-            Voir tous les clients
-          </a>
+          {isGerant && (
+            <a
+              href="/clients/nouveau"
+              class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white text-brand-700 text-sm font-semibold shadow-md hover:shadow-lg hover:-translate-y-px transition-all"
+            >
+              <Icon name="plus" size={16} />
+              Nouveau client
+            </a>
+          )}
+          {canCalendrier && (
+            <a
+              href="/calendrier"
+              class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm font-medium hover:bg-white/20 transition-all active:bg-white/25"
+            >
+              <Icon name="calendar" size={16} />
+              Calendrier de l'équipe
+            </a>
+          )}
+          {canClients && (
+            <a
+              href="/clients"
+              class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white text-sm font-medium hover:bg-white/20 transition-all active:bg-white/25"
+            >
+              <Icon name="users" size={16} />
+              Voir tous les clients
+            </a>
+          )}
         </div>
       </div>
     </section>

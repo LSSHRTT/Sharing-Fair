@@ -8,6 +8,11 @@ import { notify } from '../../../lib/notifications';
 
 const DB = Astro.locals.runtime.env.DB;
 
+// Création d'événement : réservée au gérant.
+if (Astro.locals.volunteer?.role !== 'gerant') {
+  return Astro.redirect('/?err=acces', 302);
+}
+
 // Date pré-remplie (depuis la page jour) : ?date=YYYY-MM-DD
 const dateParam = Astro.url.searchParams.get('date') ?? '';
 const defaultStartDate = isValidIsoDate(dateParam)

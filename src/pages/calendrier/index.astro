@@ -92,12 +92,19 @@ for (const e of eventRows) {
 // ============================================================
 const me = await getVolunteerFullById(DB, Astro.locals.volunteer!.id);
 let feedToken = me?.feed_token ?? null;
+
+// Création/modification d'événements : réservées au gérant.
+const isGerant = me?.role === 'gerant';
 if (!feedToken) {
   feedToken = generateFeedToken();
   await setFeedToken(DB, Astro.locals.volunteer!.id, feedToken);
 }
 const feedUrl = `${Astro.url.origin}/calendrier/feed.ics?token=${feedToken}`;
 const webcalUrl = feedUrl.replace(/^https?:\/\//, 'webcal://');
+// Liens d'abonnement directs (ouvrent la boîte « Ajouter l'agenda » du service,
+// sans passer par le schéma webcal — indispensable pour Samsung / Xiaomi…).
+const googleSubscribeUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`;
+const outlookSubscribeUrl = `https://outlook.live.com/calendar/0/addcalendar?url=${encodeURIComponent(feedUrl)}&name=${encodeURIComponent('Sharing Fair — boutique solidaire')}`;
 
 // ============================================================
 // Libellés & navigation
@@ -154,14 +161,16 @@ const MAX_PILLS = 8;  // pastilles max par cellule (mobile, style iOS)
         <Icon name="download" size={16} class="text-brand-600" />
         <span class="hidden sm:inline">S'abonner</span>
       </button>
-      <a
-        slot="actions"
-        href="/calendrier/evenement/nouveau"
-        class="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3.5 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
-      >
-        <Icon name="plus" size={16} class="text-brand-600" />
-        <span class="hidden sm:inline">Événement</span>
-      </a>
+      {isGerant && (
+        <a
+          slot="actions"
+          href="/calendrier/evenement/nouveau"
+          class="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3.5 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
+        >
+          <Icon name="plus" size={16} class="text-brand-600" />
+          <span class="hidden sm:inline">Événement</span>
+        </a>
+      )}
       <a
         slot="actions"
         href={`/calendrier/${today.iso}?m=${currentParam}`}
@@ -329,17 +338,18 @@ const MAX_PILLS = 8;  // pastilles max par cellule (mobile, style iOS)
               <p class="text-sm font-semibold text-ink-800 flex items-center gap-2">
                 <Icon name="globe" size={15} class="text-brand-600" />
                 Google Agenda
+                <span class="text-[10px] font-normal text-ink-400">(Android, Samsung, Xiaomi…)</span>
               </p>
-              <ol class="text-xs text-ink-600 space-y-1 list-decimal list-inside">
-                <li>Ouvrez Google Agenda → « Autres agendas » → <strong>+</strong> → « À partir de l'URL »</li>
-                <li>Collez le lien ci-dessous :</li>
-              </ol>
-              <div class="flex gap-2">
-                <input type="text" readonly value={feedUrl} id="feed-url-https" class="flex-1 min-w-0 h-9 px-2.5 rounded-lg border border-ink-200 bg-white text-[11px] text-ink-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
-                <button type="button" data-copy="feed-url-https" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 transition-colors" aria-label="Copier le lien">
-                  <Icon name="check" size={15} />
-                </button>
-              </div>
+              <p class="text-xs text-ink-600">Touchez ce bouton puis confirmez « Ajouter » dans Google Agenda :</p>
+              <a
+                href={googleSubscribeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex w-full items-center justify-center gap-2 h-10 px-4 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 transition-all"
+              >
+                <Icon name="calendar" size={16} />
+                S'abonner avec Google Agenda
+              </a>
             </div>
 
             <div class="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3.5">
@@ -355,6 +365,39 @@ const MAX_PILLS = 8;  // pastilles max par cellule (mobile, style iOS)
                 <Icon name="calendar" size={16} />
                 S'abonner dans l'app Calendrier
               </a>
+            </div>
+
+            <div class="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3.5">
+              <p class="text-sm font-semibold text-ink-800 flex items-center gap-2">
+                <Icon name="mail" size={15} class="text-brand-600" />
+                Outlook / Hotmail
+              </p>
+              <a
+                href={outlookSubscribeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex w-full items-center justify-center gap-2 h-10 px-4 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
+              >
+                <Icon name="calendar" size={16} class="text-brand-600" />
+                S'abonner avec Outlook
+              </a>
+            </div>
+
+            <div class="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3.5">
+              <p class="text-sm font-semibold text-ink-800">Autre application d'agenda (copie manuelle)</p>
+              <p class="text-xs text-ink-600 leading-relaxed">
+                Toute appli acceptant un « abonnement » ou « ajout par URL » fonctionne :
+                copiez ce lien dans ses réglages. Sur un téléphone <strong>Samsung</strong> ou
+                <strong> Xiaomi sans Google Agenda</strong> : installez « Google Agenda »
+                (Play Store) puis le bouton Google ci-dessus — les ventes apparaîtront aussi
+                dans l'appli Agenda du téléphone si votre compte Google est relié.
+              </p>
+              <div class="flex gap-2">
+                <input type="text" readonly value={feedUrl} id="feed-url-https" class="flex-1 min-w-0 h-9 px-2.5 rounded-lg border border-ink-200 bg-white text-[11px] text-ink-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
+                <button type="button" data-copy="feed-url-https" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 transition-colors" aria-label="Copier le lien">
+                  <Icon name="check" size={15} />
+                </button>
+              </div>
             </div>
 
             <p class="text-xs text-ink-400 leading-relaxed">
