@@ -1,0 +1,55 @@
+---
+import Icon from './ui/Icon.astro';
+import { cn } from '../lib/cn';
+
+/**
+ * Barre d'onglets mobile fixe en bas d'écran (pattern app native / PWA).
+ * Visible uniquement sous md — sur ordinateur, la Sidebar prend le relais.
+ */
+const path = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`);
+
+const items = [
+  { href: '/', label: 'Accueil', icon: 'dashboard' as const },
+  { href: '/calendrier', label: 'Calendrier', icon: 'calendar' as const },
+  { href: '/clients', label: 'Clients', icon: 'users' as const },
+  { href: '/equipe', label: 'Équipe', icon: 'heart' as const },
+];
+---
+
+<nav
+  class="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-md border-t border-ink-200 shadow-[0_-1px_3px_rgb(44_40_38/0.04)]"
+  style="padding-bottom: env(safe-area-inset-bottom, 0px)"
+  aria-label="Navigation principale"
+>
+  <div class="grid grid-cols-4">
+    {items.map((item) => {
+      const active = isActive(item.href);
+      return (
+        <a
+          href={item.href}
+          aria-current={active ? 'page' : undefined}
+          class={cn(
+            'relative flex flex-col items-center justify-center gap-0.5 min-h-[56px] pt-1.5 pb-1 text-[10px] font-medium transition-colors select-none',
+            active ? 'text-brand-700' : 'text-ink-500 active:text-ink-900',
+          )}
+        >
+          {active && (
+            <span
+              class="absolute top-0 inset-x-7 h-[3px] rounded-b-full bg-gradient-to-r from-brand-500 to-brand-600"
+              aria-hidden="true"
+            />
+          )}
+          <Icon
+            name={item.icon}
+            size={21}
+            stroke-width={active ? 2 : 1.75}
+            class={active ? 'text-brand-600' : 'text-ink-400'}
+          />
+          {item.label}
+        </a>
+      );
+    })}
+  </div>
+</nav>

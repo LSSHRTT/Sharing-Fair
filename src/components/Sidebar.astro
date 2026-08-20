@@ -17,9 +17,10 @@ const items = [
 ];
 ---
 
+<!-- Sidebar : ordinateur/tablette uniquement. Sur mobile, la navigation
+     se fait via la barre d'onglets en bas d'écran (BottomNav). -->
 <aside
-  id="app-sidebar"
-  class="fixed inset-y-0 left-0 z-40 w-64 bg-white/95 backdrop-blur-md border-r border-ink-200 flex-col -translate-x-full md:translate-x-0 md:flex md:relative md:inset-auto transition-transform duration-300 ease-out flex"
+  class="hidden md:flex w-64 bg-white/95 backdrop-blur-md border-r border-ink-200 flex-col"
 >
   <!-- Brand -->
   <a href="/" class="flex items-center gap-3 px-5 py-5 border-b border-ink-200/80 group">
@@ -71,7 +72,7 @@ const items = [
 
   <!-- Footer -->
   <div class="px-4 py-4 border-t border-ink-200/80 flex items-center justify-between text-[11px] text-ink-400">
-    <span class="font-medium">v0.3.0</span>
+    <span class="font-medium">v0.4.0</span>
     <a href="/logout" class="inline-flex items-center gap-1 hover:text-brand-700 transition-colors font-medium">
       <Icon name="arrow-right" size={12} />
       Déconnexion
@@ -79,54 +80,3 @@ const items = [
   </div>
 </aside>
 
-<!-- Mobile backdrop -->
-<div
-  id="sidebar-backdrop"
-  class="fixed inset-0 z-30 bg-ink-900/40 backdrop-blur-sm hidden md:hidden transition-opacity duration-200"
-  aria-hidden="true"
-></div>
-
-<script is:inline>
-  (function () {
-    // Délégation d'événements : le bouton #sidebar-toggle vit dans la TopBar
-    // (après ce script dans le DOM) — on écoute donc au niveau document.
-    const isOpen = () => {
-      const s = document.getElementById('app-sidebar');
-      return !!s && !s.classList.contains('-translate-x-full');
-    };
-    const open = () => {
-      const s = document.getElementById('app-sidebar');
-      const b = document.getElementById('sidebar-backdrop');
-      if (!s || !b) return;
-      s.classList.remove('-translate-x-full');
-      s.classList.add('translate-x-0');
-      b.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-    };
-    const close = () => {
-      const s = document.getElementById('app-sidebar');
-      const b = document.getElementById('sidebar-backdrop');
-      if (!s || !b) return;
-      s.classList.add('-translate-x-full');
-      s.classList.remove('translate-x-0');
-      b.classList.add('hidden');
-      document.body.style.overflow = '';
-    };
-
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('#sidebar-toggle')) {
-        isOpen() ? close() : open();
-        return;
-      }
-      if (e.target.closest('#sidebar-backdrop')) {
-        close();
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && isOpen()) close();
-    });
-    window.addEventListener('resize', () => {
-      if (window.innerWidth >= 768) close();
-    });
-  })();
-</script>
