@@ -1,8 +1,8 @@
 import { defineMiddleware } from 'astro:middleware';
 import { sessionCookieName, verifySessionToken } from './lib/auth';
-import { getVolunteerById } from './lib/volunteers';
+import { getVolunteerById, canAccess } from './lib/volunteers';
 
-const PUBLIC_PATHS = new Set(['/login']);
+const PUBLIC_PATHS = new Set(['/login', '/calendrier/feed.ics']);
 const PUBLIC_PREFIXES = [
   '/_astro/',
   '/favicon',
@@ -45,5 +45,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   locals.volunteer = volunteer;
+
+  // Contrôle d'accès par onglet (le gérant a toujours tous les accès).
+  const { pathname } = url;
+  if (pathname.startsWith('/clients') && !canAccess(volunteer, 'clients')) {
+    return redirect('/?err=acces', 302);
+  }
+  if (pathname.startsWith('/calendrier') && !canAccess(volunteer, 'calendrier')) {
+    return redirect('/?err=acces', 302);
+  }
+  if (pathname.startsWith('/equipe') && !canAccess(volunteer, 'equipe')) {
+    return redirect('/?err=acces', 302);
+  }
+
   return next();
 });

@@ -1,0 +1,139 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import Avatar from '../../../components/ui/Avatar.astro';
+import Button from '../../../components/ui/Button.astro';
+import Icon from '../../../components/ui/Icon.astro';
+import ToastAnimated from '../../../components/ui/ToastAnimated.astro';
+import { getVolunteerFullById, updatePermissions } from '../../../lib/volunteers';
+
+const DB = Astro.locals.runtime.env.DB;
+const me = Astro.locals.volunteer!;
+
+// Réservé au gérant.
+if (me.role !== 'gerant') {
+  return Astro.redirect('/equipe', 302);
+}
+
+const id = Number(Astro.params.id);
+if (!Number.isInteger(id) || id <= 0) {
+  return Astro.redirect('/equipe', 302);
+}
+
+const target = await getVolunteerFullById(DB, id);
+if (!target) {
+  return Astro.redirect('/equipe?err=introuvable', 302);
+}
+
+const isSelf = target.id === me.id;
+let error: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const role = form.get('role') === 'gerant' ? 'gerant' : 'benevole';
+  const accessCalendrier = form.get('access_calendrier') === 'on' ? 1 : 0;
+  const accessClients = form.get('access_clients') === 'on' ? 1 : 0;
+  const accessEquipe = form.get('access_equipe') === 'on' ? 1 : 0;
+
+  if (isSelf && role !== 'gerant') {
+    error = 'Vous ne pouvez pas retirer votre propre rôle de gérant (verrouillage du compte).';
+  } else {
+    await updatePermissions(DB, id, {
+      role: isSelf ? 'gerant' : role,
+      access_calendrier: accessCalendrier,
+      access_clients: accessClients,
+      access_equipe: accessEquipe,
+    });
+    return Astro.redirect('/equipe?ok=perms', 303);
+  }
+}
+
+const TABS = [
+  { key: 'access_calendrier', label: 'Calendrier', icon: 'calendar' as const, desc: 'Ventes, événements et présences.' },
+  { key: 'access_clients', label: 'Clients', icon: 'users' as const, desc: 'Fiches clients et envois groupés.' },
+  { key: 'access_equipe', label: 'Équipe', icon: 'heart' as const, desc: 'Annuaire des bénévoles.' },
+] as const;
+---
+
+<Layout title={`Permissions — ${target.first_name} ${target.last_name} — Sharing Fair`}>
+  <div class="max-w-lg mx-auto space-y-6">
+    <PageHeader
+      title="Rôle et permissions"
+      crumbs={[
+        { label: 'Équipe', href: '/equipe' },
+        { label: `${target.first_name} ${target.last_name}` },
+      ]}
+    />
+
+    {error && <ToastAnimated type="danger" message={error} />}
+
+    <section class="surface p-5 sm:p-6 animate-slide-up">
+      <div class="flex items-center gap-3 pb-4 mb-5 border-b border-ink-100">
+        <Avatar firstName={target.first_name} lastName={target.last_name} src={target.photo} size="lg" />
+        <div>
+          <p class="font-medium text-ink-900">{target.first_name} {target.last_name} {isSelf && <span class="text-ink-400 font-normal">(vous)</span>}</p>
+          <p class="text-xs text-ink-500">Les changements s'appliquent immédiatement, même pour une session déjà connectée.</p>
+        </div>
+      </div>
+
+      <form method="POST" class="space-y-6">
+        <!-- Rôle -->
+        <fieldset>
+          <legend class="text-sm font-semibold text-ink-800 mb-2 flex items-center gap-2">
+            <Icon name="shield" size={15} class="text-brand-600" />
+            Rôle
+          </legend>
+          <div class="grid grid-cols-2 gap-2">
+            <label class={`flex flex-col gap-0.5 p-3 rounded-xl border cursor-pointer transition-colors has-checked:border-brand-500 has-checked:bg-brand-50/60 has-checked:ring-1 has-checked:ring-brand-500 ${isSelf ? 'opacity-60 pointer-events-none' : 'border-ink-200 hover:border-ink-300'}`}>
+              <input type="radio" name="role" value="benevole" checked={target.role !== 'gerant'} class="sr-only" disabled={isSelf} />
+              <span class="text-sm font-semibold text-ink-900">Bénévole</span>
+              <span class="text-[11px] text-ink-500">Accès selon les onglets cochés ci-dessous.</span>
+            </label>
+            <label class={`flex flex-col gap-0.5 p-3 rounded-xl border cursor-pointer transition-colors has-checked:border-brand-500 has-checked:bg-brand-50/60 has-checked:ring-1 has-checked:ring-brand-500 ${isSelf ? 'opacity-60 pointer-events-none' : 'border-ink-200 hover:border-ink-300'}`}>
+              <input type="radio" name="role" value="gerant" checked={target.role === 'gerant'} class="sr-only" disabled={isSelf} />
+              <span class="text-sm font-semibold text-ink-900">Gérant</span>
+              <span class="text-[11px] text-ink-500">Accès total + gestion de l'équipe et des permissions.</span>
+            </label>
+          </div>
+          {isSelf && (
+            <p class="text-xs text-ink-400 mt-2">Vous ne pouvez pas modifier votre propre rôle.</p>
+          )}
+        </fieldset>
+
+        <!-- Onglets visibles -->
+        <fieldset>
+          <legend class="text-sm font-semibold text-ink-800 mb-2 flex items-center gap-2">
+            <Icon name="dashboard" size={15} class="text-brand-600" />
+            Onglets visibles
+          </legend>
+          <div class="space-y-2">
+            {TABS.map((tab) => (
+              <label class="flex items-center gap-3 p-3 rounded-xl border border-ink-200 cursor-pointer transition-colors has-checked:border-brand-500 has-checked:bg-brand-50/60 hover:border-ink-300 min-h-[56px]">
+                <input
+                  type="checkbox"
+                  name={tab.key}
+                  checked={target[tab.key] === 1}
+                  class="w-4 h-4 rounded border-ink-300 accent-brand-600"
+                />
+                <Icon name={tab.icon} size={16} class="text-ink-400" />
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium text-ink-900">{tab.label}</span>
+                  <span class="block text-[11px] text-ink-500">{tab.desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p class="text-xs text-ink-400 mt-2">Le tableau de bord reste toujours accessible.</p>
+        </fieldset>
+
+        <div class="flex flex-wrap gap-3 pt-1">
+          <Button type="submit" variant="primary" class="flex-1 sm:flex-none justify-center">
+            <Icon name="check" size={16} />
+            Enregistrer
+          </Button>
+          <Button href="/equipe" variant="ghost">Annuler</Button>
+        </div>
+      </form>
+    </section>
+  </div>
+</Layout>

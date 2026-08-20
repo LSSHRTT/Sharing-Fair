@@ -21,14 +21,15 @@ INSERT INTO clients (first_name, last_name, email, phone, address_line1, postal_
 -- ============================================================
 -- Bénévoles de démonstration
 -- Mot de passe = date de naissance (ex. connexion : Élise Rousseau / 1990-03-25)
+-- Élise : gérante (tous accès) · Hugo : accès complet · Camille : sans l'onglet Clients
 -- ============================================================
 DELETE FROM presences;
 DELETE FROM volunteers;
 
-INSERT INTO volunteers (id, first_name, last_name, birth_date, created_at) VALUES
-  (1, 'Élise',   'Rousseau',  '1990-03-25', '2026-08-01T09:00:00Z'),
-  (2, 'Hugo',    'Faure',     '1987-05-04', '2026-08-01T09:00:00Z'),
-  (3, 'Camille', 'Roux',      '1998-11-14', '2026-08-01T09:00:00Z');
+INSERT INTO volunteers (id, first_name, last_name, birth_date, role, access_calendrier, access_clients, access_equipe, created_at) VALUES
+  (1, 'Élise',   'Rousseau',  '1990-03-25', 'gerant',   1, 1, 1, '2026-08-01T09:00:00Z'),
+  (2, 'Hugo',    'Faure',     '1987-05-04', 'benevole', 1, 1, 1, '2026-08-01T09:00:00Z'),
+  (3, 'Camille', 'Roux',      '1998-11-14', 'benevole', 1, 0, 1, '2026-08-01T09:00:00Z');
 
 DELETE FROM sqlite_sequence WHERE name = 'volunteers';
 

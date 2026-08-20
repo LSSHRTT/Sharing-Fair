@@ -10,12 +10,17 @@ const path = Astro.url.pathname;
 const isActive = (href: string) =>
   href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`);
 
-const items = [
-  { href: '/', label: 'Accueil', icon: 'dashboard' as const },
-  { href: '/calendrier', label: 'Calendrier', icon: 'calendar' as const },
-  { href: '/clients', label: 'Clients', icon: 'users' as const },
-  { href: '/equipe', label: 'Équipe', icon: 'heart' as const },
+// Onglets visibles selon les permissions du bénévole (gérant : tout).
+const volunteer = Astro.locals.volunteer;
+const allItems = [
+  { href: '/', label: 'Accueil', icon: 'dashboard' as const, access: null as null },
+  { href: '/calendrier', label: 'Calendrier', icon: 'calendar' as const, access: 'calendrier' as const },
+  { href: '/clients', label: 'Clients', icon: 'users' as const, access: 'clients' as const },
+  { href: '/equipe', label: 'Équipe', icon: 'heart' as const, access: 'equipe' as const },
 ];
+const items = allItems.filter(
+  (i) => !i.access || !volunteer || volunteer.role === 'gerant' || volunteer[`access_${i.access}`] === 1,
+);
 ---
 
 <nav
@@ -23,7 +28,7 @@ const items = [
   style="padding-bottom: env(safe-area-inset-bottom, 0px)"
   aria-label="Navigation principale"
 >
-  <div class="grid grid-cols-4">
+  <div class="grid" style={`grid-template-columns: repeat(${items.length}, minmax(0, 1fr))`}>
     {items.map((item) => {
       const active = isActive(item.href);
       return (

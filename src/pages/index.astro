@@ -7,6 +7,7 @@ import Avatar from '../components/ui/Avatar.astro';
 import Icon from '../components/ui/Icon.astro';
 import { countClients, recentClients } from '../../functions/api/lib/db';
 import { fullName, formatRelative } from '../lib/format';
+import ToastAnimated from '../components/ui/ToastAnimated.astro';
 
 const DB = Astro.locals.runtime.env.DB;
 
@@ -18,7 +19,13 @@ const [total, recent] = await Promise.all([
 const hour = new Date().getHours();
 const greeting = hour < 5 ? 'Bonne nuit' : hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 const me = Astro.locals.volunteer;
+const accessDenied = Astro.url.searchParams.get('err') === 'acces';
 ---
+
+<Layout title="Sharing Fair — Tableau de bord">
+  {accessDenied && (
+    <ToastAnimated type="info" message="Cette section nécessite une autorisation du gérant. Demandez-lui l'accès si besoin." />
+  )}
 
 <Layout title="Sharing Fair — Tableau de bord">
   <div class="space-y-8 sm:space-y-10">

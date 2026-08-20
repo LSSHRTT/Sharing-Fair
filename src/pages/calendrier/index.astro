@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader.astro';
 import Icon from '../../components/ui/Icon.astro';
 import { listPresencesBetween, type PresenceStatus, type PresenceWithName } from '../../lib/volunteers';
 import { listEventsBetween, eachCoveredDay, isMultiDay, type CalendarEvent } from '../../lib/events';
+import { getVolunteerFullById, generateFeedToken, setFeedToken } from '../../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
 
@@ -31,17 +32,18 @@ const month = monthValid ? Number(mMatch[2]) : today.m; // 1..12
 const currentParam = `${year}-${String(month).padStart(2, '0')}`;
 
 // ============================================================
-// Grille de 6 semaines × 7 jours (vue bureau), semaine = lundi
+// Grille de 6 semaines × 7 jours — structure type Calendrier iOS :
+// semaine commençant le dimanche (D L M M J V S).
 // ============================================================
 const m0 = month - 1;
-const firstDow = (new Date(Date.UTC(year, m0, 1)).getUTCDay() + 6) % 7;
+const firstDow = new Date(Date.UTC(year, m0, 1)).getUTCDay(); // 0 = dimanche
 const gridStart = new Date(Date.UTC(year, m0, 1 - firstDow));
 
 interface Cell {
   iso: string;
   day: number;
   inMonth: boolean;
-  dow: number; // 0 = lundi
+  dow: number; // 0 = dimanche
 }
 const cells: Cell[] = Array.from({ length: 42 }, (_, i) => {
   const d = new Date(gridStart.getTime() + i * 86400000);
@@ -49,10 +51,9 @@ const cells: Cell[] = Array.from({ length: 42 }, (_, i) => {
     iso: d.toISOString().slice(0, 10),
     day: d.getUTCDate(),
     inMonth: d.getUTCMonth() === m0,
-    dow: (d.getUTCDay() + 6) % 7,
+    dow: d.getUTCDay(),
   };
 });
-const monthDays = cells.filter((c) => c.inMonth); // pour la vue liste (mobile)
 
 // ============================================================
 // Données : présences + événements sur la plage visible
@@ -86,6 +87,19 @@ for (const e of eventRows) {
 }
 
 // ============================================================
+// Lien d'abonnement personnel (Google/Apple Calendar) — généré à
+// la première utilisation ; réinitialisable depuis le profil.
+// ============================================================
+const me = await getVolunteerFullById(DB, Astro.locals.volunteer!.id);
+let feedToken = me?.feed_token ?? null;
+if (!feedToken) {
+  feedToken = generateFeedToken();
+  await setFeedToken(DB, Astro.locals.volunteer!.id, feedToken);
+}
+const feedUrl = `${Astro.url.origin}/calendrier/feed.ics?token=${feedToken}`;
+const webcalUrl = feedUrl.replace(/^https?:\/\//, 'webcal://');
+
+// ============================================================
 // Libellés & navigation
 // ============================================================
 const monthLabel = new Intl.DateTimeFormat('fr-FR', {
@@ -99,7 +113,9 @@ const prevParam = toParam(new Date(Date.UTC(year, m0 - 1, 1)));
 const nextParam = toParam(new Date(Date.UTC(year, m0 + 1, 1)));
 const todayParam = `${today.y}-${String(today.m).padStart(2, '0')}`;
 
-const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+// Semaine commençant le dimanche, comme le calendrier iOS.
+const WEEKDAY_LETTERS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const WEEKDAYS = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
 
 const STATUS_LABEL: Record<PresenceStatus, string> = {
   present: 'Présent',
@@ -117,9 +133,10 @@ const STATUS_DOT: Record<PresenceStatus, string> = {
   absent: 'bg-danger-500',
 };
 const EVENT_CHIP = 'bg-brand-100 text-brand-800 ring-brand-200';
+const EVENT_DOT = 'bg-brand-500';
 
-const MAX_ROWS = 3;  // lignes (événements + présences) max par cellule (bureau)
-const MAX_DOTS = 6;  // points colorés max par cellule
+const MAX_ROWS = 3;   // lignes (événements + présences) max par cellule (bureau)
+const MAX_PILLS = 8;  // pastilles max par cellule (mobile, style iOS)
 ---
 
 <Layout title="Calendrier — Sharing Fair">
@@ -128,6 +145,16 @@ const MAX_DOTS = 6;  // points colorés max par cellule
       title="Calendrier"
       description="Ventes de l'équipe et présences en boutique. Touchez un jour pour voir le détail et déclarer votre présence."
     >
+      <button
+        slot="actions"
+        type="button"
+        id="subscribe-open"
+        class="inline-flex items-center gap-1.5 h-10 sm:h-9 px-3.5 rounded-lg border border-ink-200 bg-white text-sm font-medium text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition-all"
+        aria-label="S'abonner au calendrier"
+      >
+        <Icon name="download" size={16} class="text-brand-600" />
+        <span class="hidden sm:inline">S'abonner</span>
+      </button>
       <a
         slot="actions"
         href="/calendrier/evenement/nouveau"
@@ -176,130 +203,161 @@ const MAX_DOTS = 6;  // points colorés max par cellule
     </div>
 
     <div class="surface overflow-hidden animate-fade-in" style="animation-delay: 0.05s">
+      <!-- En-têtes : une lettre sur mobile (D L M M J V S), abrégées sur bureau -->
+      <div class="grid grid-cols-7 border-b border-ink-200/80 bg-ink-50/60">
+        {WEEKDAY_LETTERS.map((d, idx) => (
+          <div class="px-1 py-2.5 sm:py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+            <span class="sm:hidden">{d}</span>
+            <span class="hidden sm:inline">{WEEKDAYS[idx]}</span>
+          </div>
+        ))}
+      </div>
 
-      {/* ============ VUE MOBILE : liste des jours du mois ============ */}
-      <div class="sm:hidden divide-y divide-ink-100">
-        {monthDays.map((cell) => {
+      <!-- Grille du mois unifiée : pastilles iOS sur mobile, chips nommées sur bureau -->
+      <div class="grid grid-cols-7">
+        {cells.map((cell) => {
           const evts = eventsByDate.get(cell.iso) ?? [];
           const presences = byDate.get(cell.iso) ?? [];
           const isToday = cell.iso === today.iso;
-          const empty = evts.length === 0 && presences.length === 0;
+          const shownEvents = evts.slice(0, MAX_ROWS);
+          const shownPresences = presences.slice(0, Math.max(0, MAX_ROWS - shownEvents.length));
+          const overflow = (evts.length - shownEvents.length) + (presences.length - shownPresences.length);
+
+          // Pastilles façon iOS (mobile) : une tirette colorée par élément.
+          const pills: { color: string; label: string }[] = [
+            ...evts.map((e) => ({ color: EVENT_DOT, label: e.title })),
+            ...presences.map((p) => ({
+              color: STATUS_DOT[p.status],
+              label: `${p.first_name} ${p.last_name} — ${STATUS_LABEL[p.status]}`,
+            })),
+          ];
+          const shownPills = pills.slice(0, MAX_PILLS);
+          const pillsOverflow = pills.length - shownPills.length;
+
           return (
             <a
               href={`/calendrier/${cell.iso}?m=${currentParam}`}
-              class={`flex gap-3 px-3 py-2.5 min-h-[52px] transition-colors active:bg-brand-50/70 ${isToday ? 'bg-brand-50/50' : ''}`}
+              class={[
+                'group relative min-h-[56px] sm:min-h-[104px] p-1 pb-1.5 sm:p-2 flex flex-col items-center sm:items-stretch gap-0.5 sm:gap-1 transition-colors border-b border-ink-100',
+                cell.inMonth ? 'bg-white active:bg-brand-50/70 hover:bg-brand-50/50' : 'bg-ink-50/40 hover:bg-ink-100/40',
+              ].join(' ')}
             >
-              <div class="flex flex-col items-center w-9 shrink-0 pt-0.5">
-                <span
-                  class={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm ${
-                    isToday ? 'bg-brand-500 text-white font-semibold shadow-sm' : 'text-ink-800 font-medium'
-                  }`}
-                >
-                  {cell.day}
+              <span
+                class={[
+                  'inline-flex items-center justify-center w-8 h-8 sm:w-7 sm:h-7 rounded-full font-semibold text-base sm:text-sm shrink-0',
+                  isToday
+                    ? 'bg-brand-500 text-white shadow-sm'
+                    : cell.inMonth
+                      ? 'text-ink-800 group-hover:text-brand-700'
+                      : 'text-ink-300 font-normal',
+                ].join(' ')}
+              >
+                {cell.day}
+              </span>
+
+              {/* Pastilles colorées — mobile (style iOS) */}
+              {pills.length > 0 && (
+                <span class="flex sm:hidden flex-wrap items-center justify-center gap-[3px] max-w-full px-0.5">
+                  {shownPills.map((p) => (
+                    <span title={p.label} class={`w-3.5 h-[5px] rounded-full ${p.color}`} aria-hidden="true" />
+                  ))}
+                  {pillsOverflow > 0 && (
+                    <span class="text-[9px] font-semibold text-ink-400 leading-[5px]">+{pillsOverflow}</span>
+                  )}
                 </span>
-                <span class="text-[10px] font-medium uppercase tracking-wide text-ink-400 mt-0.5">
-                  {WEEKDAYS[cell.dow]}
-                </span>
-              </div>
-              <div class="flex-1 min-w-0 flex flex-col gap-1 justify-center py-0.5">
-                {evts.map((e) => (
-                  <span class={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold ring-1 ring-inset ${EVENT_CHIP}`}>
-                    <Icon name="calendar" size={12} class="shrink-0" />
-                    <span class="truncate">
-                      {e.title}
-                      {isMultiDay(e) && ` (jusqu'au ${e.end_date.slice(8)})`}
-                      {e.hours ? ` · ${e.hours}` : ''}
-                    </span>
+              )}
+
+              {/* Pastilles nommées — bureau */}
+              <span class="hidden sm:flex flex-col gap-0.5 w-full">
+                {shownEvents.map((e) => (
+                  <span
+                    title={`${e.title}${isMultiDay(e) ? ` (du ${e.start_date} au ${e.end_date})` : ''}${e.hours ? ` — ${e.hours}` : ''}`}
+                    class={`flex items-center gap-1 truncate px-1.5 py-0.5 rounded-md text-[10px] font-semibold ring-1 ring-inset ${EVENT_CHIP}`}
+                  >
+                    <Icon name="calendar" size={10} class="shrink-0" />
+                    <span class="truncate">{e.title}</span>
                   </span>
                 ))}
-                {presences.length > 0 && (
-                  <span class="flex flex-wrap gap-1">
-                    {presences.map((p) => (
-                      <span
-                        class={`px-1.5 py-0.5 rounded-md text-[11px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
-                      >
-                        {p.first_name}
-                      </span>
-                    ))}
+                {shownPresences.map((p) => (
+                  <span
+                    title={`${p.first_name} ${p.last_name} — ${STATUS_LABEL[p.status]}`}
+                    class={`truncate px-1.5 py-0.5 rounded-md text-[10px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
+                  >
+                    {p.first_name}
                   </span>
+                ))}
+                {overflow > 0 && (
+                  <span class="px-1.5 text-[10px] font-medium text-ink-400">+{overflow}</span>
                 )}
-                {empty && <span class="text-xs text-ink-300 pl-2">—</span>}
-              </div>
-              <Icon name="chevron-right" size={14} class="self-center text-ink-300 shrink-0" />
+              </span>
             </a>
           );
         })}
       </div>
+    </div>
 
-      {/* ============ VUE BUREAU : grille 7 colonnes ============ */}
-      <div class="hidden sm:block">
-        <!-- En-têtes des jours -->
-        <div class="grid grid-cols-7 border-b border-ink-200/80 bg-ink-50/60">
-          {WEEKDAYS.map((d) => (
-            <div class="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-              {d}
+    <!-- Modale « S'abonner au calendrier » (Google / Apple) -->
+    <div id="subscribe-modal" class="fixed inset-0 z-[2000] hidden" role="dialog" aria-modal="true" aria-labelledby="subscribe-title">
+      <div class="fixed inset-0 bg-ink-900/40 backdrop-blur-sm animate-fade-in" data-subscribe-close aria-hidden="true"></div>
+      <div class="fixed inset-0 overflow-y-auto">
+        <div class="flex min-h-full items-end sm:items-center justify-center p-4">
+          <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in space-y-4">
+            <div class="flex items-center gap-3">
+              <span class="w-11 h-11 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
+                <Icon name="calendar" size={20} />
+              </span>
+              <div>
+                <h3 id="subscribe-title" class="font-display text-xl font-semibold text-ink-900">S'abonner au calendrier</h3>
+                <p class="text-xs text-ink-500">Ventes et événements synchronisés automatiquement.</p>
+              </div>
             </div>
-          ))}
-        </div>
 
-        <div class="grid grid-cols-7">
-          {cells.map((cell, i) => {
-            const evts = eventsByDate.get(cell.iso) ?? [];
-            const presences = byDate.get(cell.iso) ?? [];
-            const isToday = cell.iso === today.iso;
-            const isLastCol = i % 7 === 6;
-            const shownEvents = evts.slice(0, MAX_ROWS);
-            const shownPresences = presences.slice(0, Math.max(0, MAX_ROWS - shownEvents.length));
-            const overflow = (evts.length - shownEvents.length) + (presences.length - shownPresences.length);
-            return (
+            <div class="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3.5">
+              <p class="text-sm font-semibold text-ink-800 flex items-center gap-2">
+                <Icon name="globe" size={15} class="text-brand-600" />
+                Google Agenda
+              </p>
+              <ol class="text-xs text-ink-600 space-y-1 list-decimal list-inside">
+                <li>Ouvrez Google Agenda → « Autres agendas » → <strong>+</strong> → « À partir de l'URL »</li>
+                <li>Collez le lien ci-dessous :</li>
+              </ol>
+              <div class="flex gap-2">
+                <input type="text" readonly value={feedUrl} id="feed-url-https" class="flex-1 min-w-0 h-9 px-2.5 rounded-lg border border-ink-200 bg-white text-[11px] text-ink-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
+                <button type="button" data-copy="feed-url-https" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50 transition-colors" aria-label="Copier le lien">
+                  <Icon name="check" size={15} />
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-3.5">
+              <p class="text-sm font-semibold text-ink-800 flex items-center gap-2">
+                <Icon name="heart" size={15} class="text-brand-600" />
+                iPhone / Apple Calendar
+              </p>
+              <p class="text-xs text-ink-600">Depuis votre iPhone, touchez simplement :</p>
               <a
-                href={`/calendrier/${cell.iso}?m=${currentParam}`}
-                class={[
-                  'group relative min-h-[104px] p-1.5 sm:p-2 flex flex-col gap-1 transition-colors border-b border-ink-100',
-                  isLastCol ? '' : 'border-r',
-                  cell.inMonth ? 'bg-white hover:bg-brand-50/50' : 'bg-ink-50/40 hover:bg-ink-100/40',
-                ].join(' ')}
+                href={webcalUrl}
+                class="inline-flex w-full items-center justify-center gap-2 h-10 px-4 rounded-lg bg-brand-500 text-white text-sm font-medium shadow-sm hover:bg-brand-600 transition-all"
               >
-                <span class="flex items-center justify-center">
-                  <span
-                    class={[
-                      'inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium',
-                      isToday
-                        ? 'bg-brand-500 text-white shadow-sm font-semibold'
-                        : cell.inMonth
-                          ? 'text-ink-800 group-hover:text-brand-700'
-                          : 'text-ink-300',
-                    ].join(' ')}
-                  >
-                    {cell.day}
-                  </span>
-                </span>
-
-                <span class="flex flex-col gap-0.5">
-                  {shownEvents.map((e) => (
-                    <span
-                      title={`${e.title}${isMultiDay(e) ? ` (du ${e.start_date} au ${e.end_date})` : ''}${e.hours ? ` — ${e.hours}` : ''}`}
-                      class={`flex items-center gap-1 truncate px-1.5 py-0.5 rounded-md text-[10px] font-semibold ring-1 ring-inset ${EVENT_CHIP}`}
-                    >
-                      <Icon name="calendar" size={10} class="shrink-0" />
-                      <span class="truncate">{e.title}</span>
-                    </span>
-                  ))}
-                  {shownPresences.map((p) => (
-                    <span
-                      title={`${p.first_name} ${p.last_name} — ${STATUS_LABEL[p.status]}`}
-                      class={`truncate px-1.5 py-0.5 rounded-md text-[10px] font-medium ring-1 ring-inset ${STATUS_CHIP[p.status]}`}
-                    >
-                      {p.first_name}
-                    </span>
-                  ))}
-                  {overflow > 0 && (
-                    <span class="px-1.5 text-[10px] font-medium text-ink-400">+{overflow}</span>
-                  )}
-                </span>
+                <Icon name="calendar" size={16} />
+                S'abonner dans l'app Calendrier
               </a>
-            );
-          })}
+            </div>
+
+            <p class="text-xs text-ink-400 leading-relaxed">
+              ⚠️ Ce lien est <strong>personnel et secret</strong> : ne le partagez pas. S'il est compromis,
+              réinitialisez-le depuis <a href="/profil" class="text-brand-700 underline underline-offset-2">votre profil</a>
+              (l'ancien lien cessera de fonctionner).
+            </p>
+
+            <button
+              type="button"
+              data-subscribe-close
+              class="w-full h-11 px-5 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 text-white text-sm font-medium shadow-sm hover:from-brand-600 hover:to-brand-700 transition-all active:scale-[0.98]"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -324,4 +382,43 @@ const MAX_DOTS = 6;  // points colorés max par cellule
       </span>
     </div>
   </div>
+
+  <script is:inline>
+    // Modale « S'abonner » : ouverture/fermeture + copie du lien.
+    (() => {
+      const modal = document.getElementById('subscribe-modal');
+      const open = document.getElementById('subscribe-open');
+      if (!modal || !open) return;
+
+      open.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      });
+      const closeModal = () => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      };
+      modal.addEventListener('click', (e) => {
+        if (e.target.closest('[data-subscribe-close]')) closeModal();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+      });
+
+      modal.querySelectorAll('[data-copy]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const input = document.getElementById(btn.getAttribute('data-copy'));
+          if (!input) return;
+          input.select();
+          try {
+            await navigator.clipboard.writeText(input.value);
+            btn.classList.add('text-success-600', 'border-success-300');
+            setTimeout(() => btn.classList.remove('text-success-600', 'border-success-300'), 1500);
+          } catch {
+            document.execCommand('copy');
+          }
+        });
+      });
+    })();
+  </script>
 </Layout>

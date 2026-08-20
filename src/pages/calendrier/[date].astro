@@ -18,6 +18,7 @@ import {
   formatEventDateRange,
   isMultiDay,
 } from '../../lib/events';
+import { googleCalendarUrl } from '../../lib/ics';
 
 // ============================================================
 // Paramètre de route : date ISO YYYY-MM-DD (recalée au mois sinon)
@@ -188,6 +189,30 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
               {e.notes}
             </p>
           )}
+
+          <!-- Ajouter à son agenda personnel -->
+          <div class="flex flex-wrap items-center gap-2 pt-2.5 mt-1 border-t border-ink-100">
+            <span class="text-[11px] font-semibold uppercase tracking-wide text-ink-400 w-full sm:w-auto">
+              Ajouter à mon agenda :
+            </span>
+            <a
+              href={googleCalendarUrl(e)}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg ring-1 ring-inset ring-ink-200 bg-white text-xs font-medium text-ink-700 hover:bg-ink-50 hover:border-ink-300 transition-all"
+            >
+              <Icon name="calendar" size={14} class="text-brand-600" />
+              Google Agenda
+            </a>
+            <a
+              href={`/calendrier/evenement/${e.id}.ics`}
+              download
+              class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg ring-1 ring-inset ring-ink-200 bg-white text-xs font-medium text-ink-700 hover:bg-ink-50 hover:border-ink-300 transition-all"
+            >
+              <Icon name="download" size={14} class="text-brand-600" />
+              Apple / .ics
+            </a>
+          </div>
         </article>
       ))}
     </section>

@@ -12,14 +12,17 @@ import { formatDate } from '../../lib/format';
 
 const DB = Astro.locals.runtime.env.DB;
 const me = Astro.locals.volunteer!;
+const isGerant = me.role === 'gerant';
 
 // ============================================================
-// Ajout d'un bénévole (toute personne connectée peut inscrire
-// un nouveau membre de l'équipe — outil interne de confiance)
+// Ajout d'un bénévole — réservé au gérant.
 // ============================================================
 let errorKey: 'champs' | 'doublon' | null = null;
 
 if (Astro.request.method === 'POST') {
+  if (!isGerant) {
+    return new Response('Réservé au gérant', { status: 403 });
+  }
   const form = await Astro.request.formData();
   const firstName = String(form.get('first_name') ?? '').trim();
   const lastName = String(form.get('last_name') ?? '').trim();
@@ -57,6 +60,7 @@ const errorMessages: Record<string, string> = {
   champs: 'Renseignez le prénom, le nom et une date de naissance valide.',
   doublon: 'Ce bénévole existe déjà (même prénom et même nom).',
   introuvable: "Ce bénévole n'existe plus.",
+  'soi-meme': 'Impossible de vous retirer vous-même de l\'équipe.',
 };
 const error = errorMessages[errorKey ?? errParam ?? ''] ?? null;
 const toast =
@@ -64,7 +68,9 @@ const toast =
     ? 'Bénévole ajouté à l\'équipe ✅'
     : ok === 'supprime'
       ? 'Bénévole retiré de l\'équipe.'
-      : null;
+      : ok === 'perms'
+        ? 'Permissions mises à jour ✅'
+        : null;
 ---
 
 <Layout title="Équipe — Sharing Fair">
@@ -77,7 +83,8 @@ const toast =
     {toast && <ToastAnimated type="success" message={toast} />}
     {error && <ToastAnimated type="danger" message={error} />}
 
-    <!-- Ajout d'un bénévole -->
+    <!-- Ajout d'un bénévole (gérant uniquement) -->
+    {isGerant ? (
     <section class="surface p-5 sm:p-6 animate-slide-up">
       <h2 class="text-base font-semibold text-ink-900 flex items-center gap-2 mb-1">
         <Icon name="plus" size={16} class="text-brand-600" />
@@ -106,6 +113,11 @@ const toast =
         </div>
       </form>
     </section>
+    ) : (
+      <p class="text-xs text-ink-400 px-1">
+        ℹ️ L'ajout de bénévoles et la gestion des permissions sont réservés au gérant.
+      </p>
+    )}
 
     <!-- Liste des bénévoles -->
     <section class="surface overflow-hidden animate-slide-up" style="animation-delay: 0.08s">
@@ -120,9 +132,14 @@ const toast =
             <li class={`flex items-center gap-3 px-4 sm:px-5 py-3 ${isMe ? 'bg-brand-50/60' : ''}`}>
               <Avatar firstName={v.first_name} lastName={v.last_name} src={v.photo} size="md" />
               <div class="min-w-0 flex-1 leading-tight">
-                <p class="text-sm font-medium text-ink-900 truncate">
+                <p class="text-sm font-medium text-ink-900 truncate flex items-center gap-1.5">
                   {v.first_name} {v.last_name}
                   {isMe && <span class="text-ink-400 font-normal"> (vous)</span>}
+                  {v.role === 'gerant' && (
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-100 text-brand-700 ring-1 ring-inset ring-brand-200">
+                      Gérant
+                    </span>
+                  )}
                 </p>
                 <p class="text-[11px] text-ink-400 mt-0.5">
                   {v.email || v.phone
@@ -139,19 +156,31 @@ const toast =
                   <Icon name="edit" size={16} />
                 </a>
               )}
-              <form
-                method="POST"
-                action={`/equipe/${v.id}/supprimer`}
-                data-confirm={`Retirer ${v.first_name} ${v.last_name} de l'équipe ?${isMe ? ' Il s\'agit de votre propre compte : vous serez déconnecté.' : ''} Ses présences seront effacées.`}
-              >
-                <button
-                  type="submit"
-                  class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
-                  aria-label={`Retirer ${v.first_name} ${v.last_name}`}
+              {isGerant && !isMe && (
+                <a
+                  href={`/equipe/${v.id}`}
+                  class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-brand-700 hover:bg-brand-50 transition-colors"
+                  aria-label={`Permissions de ${v.first_name} ${v.last_name}`}
+                  title="Rôle et permissions"
                 >
-                  <Icon name="trash" size={16} />
-                </button>
-              </form>
+                  <Icon name="shield" size={16} />
+                </a>
+              )}
+              {isGerant && !isMe && (
+                <form
+                  method="POST"
+                  action={`/equipe/${v.id}/supprimer`}
+                  data-confirm={`Retirer ${v.first_name} ${v.last_name} de l'équipe ? Ses présences seront effacées.`}
+                >
+                  <button
+                    type="submit"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
+                    aria-label={`Retirer ${v.first_name} ${v.last_name}`}
+                  >
+                    <Icon name="trash" size={16} />
+                  </button>
+                </form>
+              )}
             </li>
           );
         })}

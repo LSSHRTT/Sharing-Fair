@@ -13,6 +13,8 @@ import {
   updatePhoto,
   updatePassword,
   verifyCredential,
+  generateFeedToken,
+  setFeedToken,
 } from '../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
@@ -71,6 +73,9 @@ if (Astro.request.method === 'POST') {
   } else if (action === 'reset_password') {
     await updatePassword(DB, me.id, null);
     return Astro.redirect('/profil?ok=reset', 303);
+  } else if (action === 'rotate_feed') {
+    await setFeedToken(DB, me.id, generateFeedToken());
+    return Astro.redirect('/profil?ok=feed', 303);
   }
 }
 
@@ -81,6 +86,7 @@ const toasts: Record<string, string> = {
   'photo-supprime': 'Photo de profil supprimée.',
   mdp: 'Mot de passe changé ✅',
   reset: 'Mot de passe réinitialisé : votre date de naissance sert à nouveau de mot de passe.',
+  feed: "Lien d'abonnement calendrier réinitialisé — pensez à mettre à jour vos agendas.",
 };
 const toast = ok ? toasts[ok] : null;
 
@@ -222,9 +228,35 @@ const hasCustomPassword = !!me.password;
         </div>
       </form>
     </section>
+
+    <!-- ===== Abonnement calendrier ===== -->
+    <section class="surface p-5 sm:p-6 animate-slide-up" style="animation-delay: 0.18s">
+      <h2 class="text-base font-semibold text-ink-900 mb-1 flex items-center gap-2">
+        <Icon name="calendar" size={16} class="text-brand-600" />
+        Abonnement calendrier
+      </h2>
+      <p class="text-sm text-ink-500 mb-4">
+        Votre lien personnel synchronise les ventes et événements dans Google Agenda ou Apple Calendar
+        (bouton « S'abonner » sur la page Calendrier).
+      </p>
+      <form method="POST" data-confirm="Réinitialiser votre lien d'abonnement ? L'ancien lien cessera immédiatement de fonctionner dans vos agendas (Google/Apple) — vous devrez alors vous réabonner.">
+        <input type="hidden" name="action" value="rotate_feed" />
+        <Button type="submit" variant="outline" class="w-full sm:w-auto justify-center">
+          <Icon name="x" size={16} />
+          Réinitialiser mon lien d'abonnement
+        </Button>
+      </form>
+    </section>
   </div>
 
   <script is:inline>
+    // Confirmation avant réinitialisation du lien d'abonnement.
+    document.querySelectorAll('form[data-confirm]').forEach((f) => {
+      f.addEventListener('submit', (e) => {
+        if (!window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+      });
+    });
+
     // Choix + redimensionnement de la photo côté navigateur :
     // → JPEG ≤ 256 px (poids ~30-80 Ko), stocké en data URL dans la base.
     (() => {

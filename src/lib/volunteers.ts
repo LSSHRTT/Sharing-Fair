@@ -11,6 +11,8 @@ import { constantTimeEqual } from './auth';
  * Système volontairement simple, adapté à une petite équipe interne.
  */
 
+export type VolunteerRole = 'gerant' | 'benevole';
+
 export interface Volunteer {
   id: number;
   first_name: string;
@@ -20,6 +22,11 @@ export interface Volunteer {
   phone: string | null;
   photo: string | null;    // data URL (JPEG redimensionné côté client)
   password: string | null; // mot de passe personnalisé (NULL = date de naissance)
+  role: VolunteerRole;
+  access_calendrier: number; // 1/0 — onglet Calendrier visible
+  access_clients: number;    // 1/0 — onglet Clients visible
+  access_equipe: number;     // 1/0 — onglet Équipe visible
+  feed_token: string | null; // jeton secret du lien d'abonnement calendrier
   created_at: string;
 }
 
@@ -29,10 +36,35 @@ export interface VolunteerIdentity {
   first_name: string;
   last_name: string;
   photo: string | null;
+  role: VolunteerRole;
+  access_calendrier: number;
+  access_clients: number;
+  access_equipe: number;
+}
+
+const ALL_COLUMNS =
+  'id, first_name, last_name, birth_date, email, phone, photo, password, role, access_calendrier, access_clients, access_equipe, feed_token, created_at';
+
+/** Un gérant voit tous les onglets, quelles que soient ses permissions. */
+export function canAccess(
+  v: Pick<VolunteerIdentity, 'role' | 'access_calendrier' | 'access_clients' | 'access_equipe'>,
+  tab: 'calendrier' | 'clients' | 'equipe',
+): boolean {
+  if (v.role === 'gerant') return true;
+  return v[`access_${tab}`] === 1;
 }
 
 export function toIdentity(v: Volunteer): VolunteerIdentity {
-  return { id: v.id, first_name: v.first_name, last_name: v.last_name, photo: v.photo };
+  return {
+    id: v.id,
+    first_name: v.first_name,
+    last_name: v.last_name,
+    photo: v.photo,
+    role: v.role,
+    access_calendrier: v.access_calendrier,
+    access_clients: v.access_clients,
+    access_equipe: v.access_equipe,
+  };
 }
 
 export type PresenceStatus = 'present' | 'maybe' | 'absent';
@@ -101,7 +133,7 @@ export function normalizeName(s: string): string {
 export async function listVolunteers(db: D1Database): Promise<Volunteer[]> {
   const res = await db
     .prepare(
-      `SELECT id, first_name, last_name, birth_date, email, phone, photo, password, created_at
+      `SELECT ${ALL_COLUMNS}
        FROM volunteers
        ORDER BY first_name COLLATE NOCASE ASC, last_name COLLATE NOCASE ASC`,
     )
@@ -114,23 +146,59 @@ export async function getVolunteerById(
   id: number,
 ): Promise<VolunteerIdentity | null> {
   const row = await db
-    .prepare('SELECT id, first_name, last_name, photo FROM volunteers WHERE id = ?')
+    .prepare(`SELECT ${ALL_COLUMNS} FROM volunteers WHERE id = ?`)
     .bind(id)
-    .first<VolunteerIdentity>();
-  return row ?? null;
+    .first<Volunteer>();
+  return row ? toIdentity(row) : null;
 }
 
 export async function getVolunteerFullById(
   db: D1Database,
   id: number,
 ): Promise<Volunteer | null> {
+  const row = await db.prepare(`SELECT ${ALL_COLUMNS} FROM volunteers WHERE id = ?`).bind(id).first<Volunteer>();
+  return row ?? null;
+}
+
+/** Recherche par jeton d'abonnement calendrier (lien secret personnel). */
+export async function findVolunteerByFeedToken(
+  db: D1Database,
+  token: string,
+): Promise<Volunteer | null> {
   const row = await db
-    .prepare(
-      'SELECT id, first_name, last_name, birth_date, email, phone, photo, password, created_at FROM volunteers WHERE id = ?',
-    )
-    .bind(id)
+    .prepare(`SELECT ${ALL_COLUMNS} FROM volunteers WHERE feed_token = ?`)
+    .bind(token)
     .first<Volunteer>();
   return row ?? null;
+}
+
+export function generateFeedToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
+export async function setFeedToken(db: D1Database, id: number, token: string): Promise<void> {
+  await db.prepare('UPDATE volunteers SET feed_token = ? WHERE id = ?').bind(token, id).run();
+}
+
+/** Met à jour le rôle et les accès aux onglets d'un bénévole (gérant). */
+export async function updatePermissions(
+  db: D1Database,
+  id: number,
+  fields: {
+    role: VolunteerRole;
+    access_calendrier: number;
+    access_clients: number;
+    access_equipe: number;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      'UPDATE volunteers SET role = ?, access_calendrier = ?, access_clients = ?, access_equipe = ? WHERE id = ?',
+    )
+    .bind(fields.role, fields.access_calendrier, fields.access_clients, fields.access_equipe, id)
+    .run();
 }
 
 /** Met à jour les coordonnées d'un bénévole (chaque champ remplacé, null = vidé). */
@@ -174,11 +242,7 @@ export async function findVolunteerForLogin(
   if (!first || !last) return null;
 
   // L'équipe est petite : filtrage en mémoire, robuste aux accents/casse.
-  const res = await db
-    .prepare(
-      'SELECT id, first_name, last_name, birth_date, email, phone, photo, password, created_at FROM volunteers',
-    )
-    .all<Volunteer>();
+  const res = await db.prepare(`SELECT ${ALL_COLUMNS} FROM volunteers`).all<Volunteer>();
   return (
     res.results.find(
       (v) => normalizeName(v.first_name) === first && normalizeName(v.last_name) === last,
@@ -201,11 +265,11 @@ export async function createVolunteer(
   const now = new Date().toISOString();
   const inserted = await db
     .prepare(
-      `INSERT INTO volunteers (first_name, last_name, birth_date, created_at)
-       VALUES (?, ?, ?, ?)
-       RETURNING id, first_name, last_name, birth_date, created_at`,
+      `INSERT INTO volunteers (first_name, last_name, birth_date, feed_token, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING ${ALL_COLUMNS}`,
     )
-    .bind(input.first_name.trim(), input.last_name.trim(), input.birth_date, now)
+    .bind(input.first_name.trim(), input.last_name.trim(), input.birth_date, generateFeedToken(), now)
     .first<Volunteer>();
 
   if (!inserted) throw new Error('Insertion du bénévole échouée');
