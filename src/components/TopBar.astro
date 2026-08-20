@@ -1,5 +1,6 @@
 ---
 import Icon from './ui/Icon.astro';
+import Avatar from './ui/Avatar.astro';
 import InstallButton from './pwa/InstallButton.astro';
 import { countUnread } from '../lib/notifications';
 import { canDo } from '../lib/volunteers';
@@ -51,6 +52,12 @@ const canCreateClient = !!me && canDo(me, 'add_clients');
 
     <!-- Right actions -->
     <div class="ml-auto lg:ml-0 flex items-center gap-2">
+      <!-- Avatar → Mon profil (mobile) -->
+      {me && (
+        <a href="/profil" class="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-full" aria-label="Mon profil">
+          <Avatar firstName={me.first_name} lastName={me.last_name} src={me.photo} size="sm" class="ring-1 ring-ink-200 hover:ring-brand-400 transition-all" />
+        </a>
+      )}
       <!-- Cloche de notifications -->
       <a
         href="/notifications"
