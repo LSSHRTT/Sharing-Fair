@@ -60,7 +60,9 @@ export function buildIcs(events: CalendarEvent[], calName = 'Sharing Fair — bo
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcsText(calName)}`,
-    'X-WR-TIMEZONE:Europe/Paris',
+    // NB : pas de X-WR-TIMEZONE sans VTIMEZONE associé — Google Calendar
+    // rejette strictement les flux non conformes (événements en journée
+    // entière, le fuseau est de toute façon inutile ici).
   ];
 
   for (const e of events) {

@@ -5,7 +5,7 @@ import { jsonOk, jsonError } from '../../../../functions/api/lib/response';
 import { requireClientApiAuth } from '../../../lib/apiGuard';
 
 export const POST: APIRoute = async (context) => {
-  const denied = await requireClientApiAuth(context, { write: true });
+  const denied = await requireClientApiAuth(context, { action: 'add_clients' });
   if (denied) return denied;
 
   let body: unknown;

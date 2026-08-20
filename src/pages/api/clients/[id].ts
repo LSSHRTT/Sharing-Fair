@@ -21,7 +21,7 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const PUT: APIRoute = async (context) => {
-  const denied = await requireClientApiAuth(context, { write: true });
+  const denied = await requireClientApiAuth(context, { action: 'edit_clients' });
   if (denied) return denied;
 
   const id = clientIdFrom(context.params);
@@ -43,7 +43,7 @@ export const PUT: APIRoute = async (context) => {
 };
 
 export const DELETE: APIRoute = async (context) => {
-  const denied = await requireClientApiAuth(context, { write: true });
+  const denied = await requireClientApiAuth(context, { action: 'delete_clients' });
   if (denied) return denied;
 
   const id = clientIdFrom(context.params);

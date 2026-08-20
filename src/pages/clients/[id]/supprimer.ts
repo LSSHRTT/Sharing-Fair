@@ -1,10 +1,11 @@
 import type { APIRoute } from 'astro';
 import { deleteClient } from '../../../../functions/api/lib/db';
+import { canDo } from '../../../lib/volunteers';
 
 export const POST: APIRoute = async ({ params, locals, redirect }) => {
-  // Suppression de fiche : réservée au gérant.
-  if (locals.volunteer?.role !== 'gerant') {
-    return new Response('Réservé au gérant', { status: 403 });
+  // Suppression de fiche : capacité « Supprimer les clients » requise.
+  if (!locals.volunteer || !canDo(locals.volunteer, 'delete_clients')) {
+    return new Response('Action non autorisée', { status: 403 });
   }
 
   const id = Number(params.id);

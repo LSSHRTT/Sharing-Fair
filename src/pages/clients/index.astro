@@ -11,8 +11,10 @@ import { fullName } from '../../lib/format';
 import { listClients, listDistinctTags } from '../../../functions/api/lib/db';
 
 const DB = Astro.locals.runtime.env.DB;
-// Création / envois groupés / suppression : réservés au gérant.
-const isGerant = Astro.locals.volunteer?.role === 'gerant';
+const me = Astro.locals.volunteer!;
+// Création, envois groupés, cases à cocher : capacités individuelles requises.
+const canAddClient = me.can_add_clients === 1 || me.role === 'gerant';
+const canSendMail = me.can_send_mail === 1 || me.role === 'gerant';
 
 const q = Astro.url.searchParams.get('q')?.trim() || '';
 const tag = Astro.url.searchParams.get('tag')?.trim() || '';
@@ -57,13 +59,13 @@ if (tag) carryParams.tag = tag;
       <span slot="actions" class="text-sm text-ink-500 self-center">
         <strong class="font-display text-lg text-ink-900">{total}</strong> {total > 1 ? 'fiches' : 'fiche'}
       </span>
-      {isGerant && (
+      {canSendMail && (
         <Button slot="actions" variant="secondary" id="open-email-modal">
           <Icon name="mail" size={16} />
           Envoyer un mail
         </Button>
       )}
-      {isGerant && (
+      {canAddClient && (
         <Button slot="actions" href="/clients/nouveau" variant="primary">
           <Icon name="plus" size={16} />
           Nouveau client
@@ -254,7 +256,7 @@ if (tag) carryParams.tag = tag;
           : 'Créez votre première fiche client pour commencer.'}
       >
         <Icon slot="icon" name="users" size={24} />
-        {!q && !tag && isGerant && (
+        {!q && !tag && canAddClient && (
           <Button slot="actions" href="/clients/nouveau" variant="primary">
             <Icon name="plus" size={16} />
             Créer le premier client
@@ -269,7 +271,7 @@ if (tag) carryParams.tag = tag;
     ) : (
       <>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-stagger>
-          {clients.map((client) => <ClientCard client={client} />)}
+          {clients.map((client) => <ClientCard client={client} showCheckbox={canSendMail} />)}
         </div>
 
         <Pagination

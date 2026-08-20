@@ -5,11 +5,12 @@ import ToastAnimated from '../../../components/ui/ToastAnimated.astro';
 import EventForm from '../../../components/events/EventForm.astro';
 import { createEvent, isValidIsoDate } from '../../../lib/events';
 import { notify } from '../../../lib/notifications';
+import { canDo } from '../../../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
 
-// Création d'événement : réservée au gérant.
-if (Astro.locals.volunteer?.role !== 'gerant') {
+// Création d'événement : capacité « Gérer les événements » requise.
+if (!canDo(Astro.locals.volunteer!, 'manage_events')) {
   return Astro.redirect('/?err=acces', 302);
 }
 

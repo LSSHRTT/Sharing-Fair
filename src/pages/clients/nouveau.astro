@@ -5,11 +5,12 @@ import Toast from '../../components/ui/Toast.astro';
 import ClientForm from '../../components/clients/ClientForm.astro';
 import { clientInputSchema } from '../../../functions/api/lib/schemas';
 import { createClient } from '../../../functions/api/lib/db';
+import { canDo } from '../../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
 
-// Création de client : réservée au gérant.
-if (Astro.locals.volunteer?.role !== 'gerant') {
+// Création de client : capacité « Ajouter des clients » requise (gérant : toujours).
+if (!canDo(Astro.locals.volunteer!, 'add_clients')) {
   return Astro.redirect('/?err=acces', 302);
 }
 

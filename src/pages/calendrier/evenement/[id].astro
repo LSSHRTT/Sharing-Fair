@@ -6,11 +6,12 @@ import Button from '../../../components/ui/Button.astro';
 import Icon from '../../../components/ui/Icon.astro';
 import EventForm from '../../../components/events/EventForm.astro';
 import { getEvent, updateEvent, isValidIsoDate } from '../../../lib/events';
+import { canDo } from '../../../lib/volunteers';
 
 const DB = Astro.locals.runtime.env.DB;
 
-// Modification d'événement : réservée au gérant.
-if (Astro.locals.volunteer?.role !== 'gerant') {
+// Modification d'événement : capacité « Gérer les événements » requise.
+if (!canDo(Astro.locals.volunteer!, 'manage_events')) {
   return Astro.redirect('/?err=acces', 302);
 }
 

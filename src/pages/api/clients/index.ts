@@ -18,7 +18,7 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const POST: APIRoute = async (context) => {
-  const denied = await requireClientApiAuth(context, { write: true });
+  const denied = await requireClientApiAuth(context, { action: 'add_clients' });
   if (denied) return denied;
 
   let body: unknown;

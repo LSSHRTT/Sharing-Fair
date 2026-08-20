@@ -85,8 +85,8 @@ for (const v of volunteers) {
 
 const myStatus = statusByVolunteer.get(me.id) ?? null;
 
-// Edition des événements : réservée au gérant.
-const isGerant = me.role === 'gerant';
+// Edition des événements : capacité « Gérer les événements » requise.
+const isGerant = me.role === 'gerant' || me.can_manage_events === 1;
 
 const dateLabelRaw = new Intl.DateTimeFormat('fr-FR', {
   weekday: 'long',

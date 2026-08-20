@@ -1,10 +1,11 @@
 import type { APIRoute } from 'astro';
 import { deleteEvent, getEvent } from '../../../../lib/events';
+import { canDo } from '../../../../lib/volunteers';
 
 export const POST: APIRoute = async ({ params, locals, redirect }) => {
-  // Suppression d'événement : réservée au gérant.
-  if (locals.volunteer?.role !== 'gerant') {
-    return new Response('Réservé au gérant', { status: 403 });
+  // Suppression d'événement : capacité « Gérer les événements » requise.
+  if (!locals.volunteer || !canDo(locals.volunteer, 'manage_events')) {
+    return new Response('Action non autorisée', { status: 403 });
   }
 
   const id = Number(params.id);

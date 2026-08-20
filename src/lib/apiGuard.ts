@@ -1,18 +1,18 @@
 import type { APIContext } from 'astro';
 import { sessionCookieName, verifySessionToken } from './auth';
-import { getVolunteerById, canAccess, type VolunteerIdentity } from './volunteers';
+import { getVolunteerById, canAccess, canDo, type VolunteerIdentity, type Capability } from './volunteers';
 import { jsonError } from '../../functions/api/lib/response';
 
 /**
  * Garde des endpoints /api/** :
  * - lecture  : bénévole connecté·e avec accès à l'onglet Clients ;
- * - écriture : réservée au gérant.
+ * - écriture : capacité précise requise (ex. 'delete_clients') — gérant : toutes.
  *
  * Retourne null si tout est OK, sinon la Response d'erreur (401/403).
  */
 export async function requireClientApiAuth(
   context: APIContext,
-  opts: { write?: boolean } = {},
+  opts: { action?: Capability } = {},
 ): Promise<Response | null> {
   const env = context.locals.runtime.env;
   const token = context.cookies.get(sessionCookieName())?.value;
@@ -21,6 +21,6 @@ export async function requireClientApiAuth(
 
   if (!me) return jsonError('Authentification requise', 401);
   if (!canAccess(me, 'clients')) return jsonError('Accès non autorisé', 403);
-  if (opts.write && me.role !== 'gerant') return jsonError('Réservé au gérant', 403);
+  if (opts.action && !canDo(me, opts.action)) return jsonError('Action non autorisée', 403);
   return null;
 }

@@ -23,6 +23,7 @@ const accessDenied = Astro.url.searchParams.get('err') === 'acces';
 const isGerant = me?.role === 'gerant';
 const canClients = !!me && (isGerant || me.access_clients === 1);
 const canCalendrier = !!me && (isGerant || me.access_calendrier === 1);
+const canAddClient = !!me && (isGerant || me.can_add_clients === 1);
 ---
 
 <Layout title="Sharing Fair — Tableau de bord">
@@ -45,7 +46,7 @@ const canCalendrier = !!me && (isGerant || me.access_calendrier === 1);
           Votre espace dédié à la gestion des clients de la boutique solidaire.
         </p>
         <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2.5 sm:gap-3">
-          {isGerant && (
+          {canAddClient && (
             <a
               href="/clients/nouveau"
               class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-white text-brand-700 text-sm font-semibold shadow-md hover:shadow-lg hover:-translate-y-px transition-all"
@@ -76,8 +77,8 @@ const canCalendrier = !!me && (isGerant || me.access_calendrier === 1);
       </div>
     </section>
 
-    <!-- Stats : bandeau compact 3 colonnes sur mobile -->
-    <section class="grid grid-cols-3 gap-2 sm:gap-4" data-stagger>
+    <!-- Stats -->
+    <section class="grid grid-cols-2 gap-2 sm:gap-4" data-stagger>
       <Card class="p-3 sm:p-5 relative overflow-hidden surface-hover">
         <div class="hidden sm:block absolute top-0 right-0 w-32 h-32 bg-brand-100/40 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3" aria-hidden="true"></div>
         <div class="relative flex items-start justify-between">
@@ -106,19 +107,6 @@ const canCalendrier = !!me && (isGerant || me.access_calendrier === 1);
         </div>
       </Card>
 
-      <Card class="p-3 sm:p-5 relative overflow-hidden surface-hover">
-        <div class="hidden sm:block absolute top-0 right-0 w-32 h-32 bg-info-100/40 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3" aria-hidden="true"></div>
-        <div class="relative flex items-start justify-between">
-          <div class="min-w-0">
-            <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-ink-500 mb-1 sm:mb-2 truncate">Version</p>
-            <p class="font-display text-2xl sm:text-4xl text-ink-900">0.4</p>
-            <p class="hidden sm:block text-xs text-ink-400 mt-1">Navigation mobile</p>
-          </div>
-          <span class="hidden sm:flex w-11 h-11 rounded-xl bg-info-100 text-info-700 items-center justify-center shrink-0">
-            <Icon name="heart" size={20} />
-          </span>
-        </div>
-      </Card>
     </section>
 
     <!-- Recent clients -->

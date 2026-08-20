@@ -7,13 +7,15 @@ import type { Client } from '../../../functions/api/lib/db';
 
 interface Props {
   client: Client;
+  /** Case à cocher d'envoi groupé — affichée seulement si l'utilisateur peut envoyer des mails. */
+  showCheckbox?: boolean;
 }
 
-const { client } = Astro.props;
+const { client, showCheckbox = false } = Astro.props;
 ---
 
 <Card href={`/clients/${client.id}`} hover padded={false} class="p-5 group relative">
-  {client.email && (
+  {client.email && showCheckbox && (
     <label
       class="absolute top-3 right-3 z-10 flex items-center justify-center w-6 h-6 rounded-md border border-ink-200 bg-white/90 backdrop-blur-sm cursor-pointer shadow-xs hover:border-brand-400 hover:bg-brand-50 transition-colors has-checked:bg-brand-500 has-checked:border-brand-500 has-checked:[&_svg]:opacity-100"
       title={`Sélectionner ${fullName(client)} pour un envoi groupé`}

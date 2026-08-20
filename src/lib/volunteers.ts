@@ -27,6 +27,13 @@ export interface Volunteer {
   access_clients: number;    // 1/0 — onglet Clients visible
   access_equipe: number;     // 1/0 — onglet Équipe visible
   feed_token: string | null; // jeton secret du lien d'abonnement calendrier
+  // Capacités accordées individuellement (sans rôle gérant) :
+  can_manage_events: number; // créer/modifier/supprimer des événements
+  can_add_clients: number;
+  can_edit_clients: number;
+  can_delete_clients: number;
+  can_send_mail: number;
+  can_add_volunteer: number;
   created_at: string;
 }
 
@@ -40,10 +47,16 @@ export interface VolunteerIdentity {
   access_calendrier: number;
   access_clients: number;
   access_equipe: number;
+  can_manage_events: number;
+  can_add_clients: number;
+  can_edit_clients: number;
+  can_delete_clients: number;
+  can_send_mail: number;
+  can_add_volunteer: number;
 }
 
 const ALL_COLUMNS =
-  'id, first_name, last_name, birth_date, email, phone, photo, password, role, access_calendrier, access_clients, access_equipe, feed_token, created_at';
+  'id, first_name, last_name, birth_date, email, phone, photo, password, role, access_calendrier, access_clients, access_equipe, feed_token, can_manage_events, can_add_clients, can_edit_clients, can_delete_clients, can_send_mail, can_add_volunteer, created_at';
 
 /** Un gérant voit tous les onglets, quelles que soient ses permissions. */
 export function canAccess(
@@ -52,6 +65,20 @@ export function canAccess(
 ): boolean {
   if (v.role === 'gerant') return true;
   return v[`access_${tab}`] === 1;
+}
+
+/** Capacité accordée individuellement — le rôle gérant a tout par défaut. */
+export type Capability =
+  | 'manage_events'
+  | 'add_clients'
+  | 'edit_clients'
+  | 'delete_clients'
+  | 'send_mail'
+  | 'add_volunteer';
+
+export function canDo(v: VolunteerIdentity, action: Capability): boolean {
+  if (v.role === 'gerant') return true;
+  return v[`can_${action}`] === 1;
 }
 
 export function toIdentity(v: Volunteer): VolunteerIdentity {
@@ -64,6 +91,12 @@ export function toIdentity(v: Volunteer): VolunteerIdentity {
     access_calendrier: v.access_calendrier,
     access_clients: v.access_clients,
     access_equipe: v.access_equipe,
+    can_manage_events: v.can_manage_events,
+    can_add_clients: v.can_add_clients,
+    can_edit_clients: v.can_edit_clients,
+    can_delete_clients: v.can_delete_clients,
+    can_send_mail: v.can_send_mail,
+    can_add_volunteer: v.can_add_volunteer,
   };
 }
 
@@ -182,7 +215,7 @@ export async function setFeedToken(db: D1Database, id: number, token: string): P
   await db.prepare('UPDATE volunteers SET feed_token = ? WHERE id = ?').bind(token, id).run();
 }
 
-/** Met à jour le rôle et les accès aux onglets d'un bénévole (gérant). */
+/** Met à jour le rôle, les accès aux onglets et les capacités d'un bénévole (gérant). */
 export async function updatePermissions(
   db: D1Database,
   id: number,
@@ -191,13 +224,35 @@ export async function updatePermissions(
     access_calendrier: number;
     access_clients: number;
     access_equipe: number;
+    can_manage_events: number;
+    can_add_clients: number;
+    can_edit_clients: number;
+    can_delete_clients: number;
+    can_send_mail: number;
+    can_add_volunteer: number;
   },
 ): Promise<void> {
   await db
     .prepare(
-      'UPDATE volunteers SET role = ?, access_calendrier = ?, access_clients = ?, access_equipe = ? WHERE id = ?',
+      `UPDATE volunteers SET
+         role = ?, access_calendrier = ?, access_clients = ?, access_equipe = ?,
+         can_manage_events = ?, can_add_clients = ?, can_edit_clients = ?,
+         can_delete_clients = ?, can_send_mail = ?, can_add_volunteer = ?
+       WHERE id = ?`,
     )
-    .bind(fields.role, fields.access_calendrier, fields.access_clients, fields.access_equipe, id)
+    .bind(
+      fields.role,
+      fields.access_calendrier,
+      fields.access_clients,
+      fields.access_equipe,
+      fields.can_manage_events,
+      fields.can_add_clients,
+      fields.can_edit_clients,
+      fields.can_delete_clients,
+      fields.can_send_mail,
+      fields.can_add_volunteer,
+      id,
+    )
     .run();
 }
 

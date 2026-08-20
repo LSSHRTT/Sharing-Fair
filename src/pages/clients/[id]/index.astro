@@ -17,8 +17,10 @@ if (!Number.isInteger(clientId) || clientId <= 0) {
 
 const DB = Astro.locals.runtime.env.DB;
 const client = await getClient(DB, clientId);
-// Modification / suppression : réservées au gérant.
-const isGerant = Astro.locals.volunteer?.role === 'gerant';
+// Modification / suppression : capacités individuelles requises.
+const me = Astro.locals.volunteer;
+const canEdit = !!me && (me.role === 'gerant' || me.can_edit_clients === 1);
+const canDelete = !!me && (me.role === 'gerant' || me.can_delete_clients === 1);
 
 if (!client) {
   return new Response(null, { status: 404 });
@@ -34,13 +36,13 @@ if (!client) {
         { label: fullName(client) },
       ]}
     >
-      {isGerant && (
+      {canEdit && (
         <Button slot="actions" href={`/clients/${client.id}/modifier`} variant="outline" class="flex-1 sm:flex-none justify-center">
           <Icon name="edit" size={16} />
           Modifier
         </Button>
       )}
-      {isGerant && (
+      {canDelete && (
         <Button slot="actions" variant="danger" data-open-modal="delete-confirm" class="flex-1 sm:flex-none justify-center">
           <Icon name="trash" size={16} />
           Supprimer
@@ -101,8 +103,8 @@ if (!client) {
     </div>
   </div>
 
-  {/* Delete confirmation modal — rendue uniquement pour le gérant */}
-  {isGerant && (
+  {/* Delete confirmation modal — rendue uniquement si suppression autorisée */}
+  {canDelete && (
   <div
     id="delete-confirm"
     class="fixed inset-0 z-[1000] hidden"

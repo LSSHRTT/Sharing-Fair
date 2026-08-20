@@ -53,6 +53,12 @@ if (Astro.request.method === 'POST') {
     const accessCalendrier = form.get('access_calendrier') === 'on' ? 1 : 0;
     const accessClients = form.get('access_clients') === 'on' ? 1 : 0;
     const accessEquipe = form.get('access_equipe') === 'on' ? 1 : 0;
+    const canManageEvents = form.get('can_manage_events') === 'on' ? 1 : 0;
+    const canAddClients = form.get('can_add_clients') === 'on' ? 1 : 0;
+    const canEditClients = form.get('can_edit_clients') === 'on' ? 1 : 0;
+    const canDeleteClients = form.get('can_delete_clients') === 'on' ? 1 : 0;
+    const canSendMail = form.get('can_send_mail') === 'on' ? 1 : 0;
+    const canAddVolunteer = form.get('can_add_volunteer') === 'on' ? 1 : 0;
 
     if (isSelf && role !== 'gerant') {
       error = 'Vous ne pouvez pas retirer votre propre rôle de gérant (verrouillage du compte).';
@@ -62,6 +68,12 @@ if (Astro.request.method === 'POST') {
         access_calendrier: accessCalendrier,
         access_clients: accessClients,
         access_equipe: accessEquipe,
+        can_manage_events: canManageEvents,
+        can_add_clients: canAddClients,
+        can_edit_clients: canEditClients,
+        can_delete_clients: canDeleteClients,
+        can_send_mail: canSendMail,
+        can_add_volunteer: canAddVolunteer,
       });
       return Astro.redirect('/equipe?ok=perms', 303);
     }
@@ -81,6 +93,16 @@ const TABS = [
   { key: 'access_calendrier', label: 'Calendrier', icon: 'calendar' as const, desc: 'Ventes, événements et présences.' },
   { key: 'access_clients', label: 'Clients', icon: 'users' as const, desc: 'Fiches clients et envois groupés.' },
   { key: 'access_equipe', label: 'Équipe', icon: 'heart' as const, desc: 'Annuaire des bénévoles.' },
+] as const;
+
+// Capacités accordables individuellement (sans rôle gérant)
+const CAPS = [
+  { key: 'can_manage_events', label: 'Gérer les événements', desc: 'Créer, modifier et supprimer les ventes.' },
+  { key: 'can_add_clients', label: 'Ajouter des clients', desc: 'Créer de nouvelles fiches (+ import).', },
+  { key: 'can_edit_clients', label: 'Modifier les clients', desc: 'Éditer les fiches existantes.' },
+  { key: 'can_delete_clients', label: 'Supprimer des clients', desc: 'Effacer définitivement une fiche.' },
+  { key: 'can_send_mail', label: 'Envoyer des mails groupés', desc: 'Préparer les envois vers les clients.' },
+  { key: 'can_add_volunteer', label: 'Ajouter des bénévoles', desc: 'Inscrire de nouveaux membres.' },
 ] as const;
 ---
 
@@ -154,6 +176,34 @@ const TABS = [
             ))}
           </div>
           <p class="text-xs text-ink-400 mt-2">Le tableau de bord reste toujours accessible.</p>
+        </fieldset>
+
+        <!-- Actions autorisées (capacités individuelles, sans rôle gérant) -->
+        <fieldset>
+          <legend class="text-sm font-semibold text-ink-800 mb-2 flex items-center gap-2">
+            <Icon name="check" size={15} class="text-brand-600" />
+            Actions autorisées
+          </legend>
+          <div class="space-y-2">
+            {CAPS.map((cap) => (
+              <label class="flex items-start gap-3 p-3 rounded-lg border border-ink-200 cursor-pointer transition-colors has-checked:border-brand-500 has-checked:bg-brand-50/60 hover:border-ink-300">
+                <input
+                  type="checkbox"
+                  name={cap.key}
+                  checked={target[cap.key] === 1}
+                  class="w-4 h-4 mt-0.5 rounded border-ink-300 accent-brand-600"
+                />
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium text-ink-900">{cap.label}</span>
+                  <span class="block text-[11px] text-ink-500">{cap.desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p class="text-xs text-ink-400 mt-2">
+            Le rôle <strong>gérant</strong> possède toutes ces actions + la suppression de bénévoles
+            + la gestion des permissions (réservées au gérant).
+          </p>
         </fieldset>
 
         <div class="flex flex-wrap gap-3 pt-1">

@@ -6,12 +6,13 @@ import ClientForm from '../../../components/clients/ClientForm.astro';
 import { clientInputSchema } from '../../../../functions/api/lib/schemas';
 import { getClient, updateClient } from '../../../../functions/api/lib/db';
 import { fullName } from '../../../lib/format';
+import { canDo } from '../../../lib/volunteers';
 
 const { id } = Astro.params;
 const clientId = Number(id);
 
-// Modification de fiche : réservée au gérant.
-if (Astro.locals.volunteer?.role !== 'gerant') {
+// Modification de fiche : capacité « Modifier les clients » requise.
+if (!canDo(Astro.locals.volunteer!, 'edit_clients')) {
   return Astro.redirect('/?err=acces', 302);
 }
 

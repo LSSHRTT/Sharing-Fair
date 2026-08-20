@@ -93,8 +93,8 @@ for (const e of eventRows) {
 const me = await getVolunteerFullById(DB, Astro.locals.volunteer!.id);
 let feedToken = me?.feed_token ?? null;
 
-// Création/modification d'événements : réservées au gérant.
-const isGerant = me?.role === 'gerant';
+// Création/modification d'événements : capacité « Gérer les événements » requise.
+const isGerant = !!me && (me.role === 'gerant' || me.can_manage_events === 1);
 if (!feedToken) {
   feedToken = generateFeedToken();
   await setFeedToken(DB, Astro.locals.volunteer!.id, feedToken);
@@ -404,6 +404,12 @@ const MAX_PILLS = 8;  // pastilles max par cellule (mobile, style iOS)
               ⚠️ Ce lien est <strong>personnel et secret</strong> : ne le partagez pas. S'il est compromis,
               réinitialisez-le depuis <a href="/profil" class="text-brand-700 underline underline-offset-2">votre profil</a>
               (l'ancien lien cessera de fonctionner).
+              <br />
+              Un doute ?
+              <a href={feedUrl} target="_blank" rel="noopener noreferrer" class="text-brand-700 underline underline-offset-2">
+                Testez votre lien
+              </a>
+              : si un texte commençant par « BEGIN:VCALENDAR » s'affiche, le lien fonctionne côté boutique.
             </p>
 
             <button

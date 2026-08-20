@@ -2,7 +2,7 @@
 import Icon from './ui/Icon.astro';
 import InstallButton from './pwa/InstallButton.astro';
 import { countUnread } from '../lib/notifications';
-import { canAccess } from '../lib/volunteers';
+import { canDo } from '../lib/volunteers';
 
 const path = Astro.url.pathname;
 
@@ -22,8 +22,8 @@ const q = Astro.url.searchParams.get('q') ?? '';
 
 const me = Astro.locals.volunteer;
 const unread = me ? await countUnread(Astro.locals.runtime.env.DB, me.id) : 0;
-// Création de client : réservée au gérant (les bénévoles consultent les fiches).
-const canCreateClient = me?.role === 'gerant';
+// Création de client : capacité « Ajouter des clients » requise.
+const canCreateClient = !!me && canDo(me, 'add_clients');
 ---
 
 <header class="sticky top-0 z-20 bg-white/85 backdrop-blur-md border-b border-ink-200">

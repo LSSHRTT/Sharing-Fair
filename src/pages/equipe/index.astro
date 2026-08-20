@@ -14,15 +14,17 @@ import { formatDate } from '../../lib/format';
 const DB = Astro.locals.runtime.env.DB;
 const me = Astro.locals.volunteer!;
 const isGerant = me.role === 'gerant';
+// Ajout de bénévole : capacité individuelle possible (sans rôle gérant).
+const canAddVolunteer = isGerant || me.can_add_volunteer === 1;
 
 // ============================================================
-// Ajout d'un bénévole — réservé au gérant.
+// Ajout d'un bénévole — capacité « Ajouter des bénévoles » requise.
 // ============================================================
 let errorKey: 'champs' | 'doublon' | null = null;
 
 if (Astro.request.method === 'POST') {
-  if (!isGerant) {
-    return new Response('Réservé au gérant', { status: 403 });
+  if (!canAddVolunteer) {
+    return new Response('Action non autorisée', { status: 403 });
   }
   const form = await Astro.request.formData();
   const firstName = String(form.get('first_name') ?? '').trim();
@@ -91,8 +93,8 @@ const toast =
     {toast && <ToastAnimated type="success" message={toast} />}
     {error && <ToastAnimated type="danger" message={error} />}
 
-    <!-- Ajout d'un bénévole (gérant uniquement) -->
-    {isGerant ? (
+    <!-- Ajout d'un bénévole (capacité « Ajouter des bénévoles » requise) -->
+    {canAddVolunteer ? (
     <section class="surface p-5 sm:p-6 animate-slide-up">
       <h2 class="text-base font-semibold text-ink-900 flex items-center gap-2 mb-1">
         <Icon name="plus" size={16} class="text-brand-600" />
@@ -123,7 +125,7 @@ const toast =
     </section>
     ) : (
       <p class="text-xs text-ink-400 px-1">
-        ℹ️ L'ajout de bénévoles et la gestion des permissions sont réservés au gérant.
+        ℹ️ La gestion des membres et des permissions passe par le gérant (ou une personne autorisée).
       </p>
     )}
 
