@@ -112,6 +112,10 @@ export interface PresenceWithName {
   volunteer_id: number;
   date: string;
   status: PresenceStatus;
+  hours: number | null;
+  hours_verified: number;
+  verified_by: number | null;
+  verified_at: string | null;
   first_name: string;
   last_name: string;
 }
@@ -348,7 +352,7 @@ export async function listPresencesBetween(
 ): Promise<PresenceWithName[]> {
   const res = await db
     .prepare(
-      `SELECT p.volunteer_id, p.date, p.status, v.first_name, v.last_name
+      `SELECT p.volunteer_id, p.date, p.status, p.hours, p.hours_verified, p.verified_by, p.verified_at, v.first_name, v.last_name
        FROM presences p
        JOIN volunteers v ON v.id = p.volunteer_id
        WHERE p.date BETWEEN ? AND ?
@@ -389,4 +393,61 @@ export async function clearPresence(
     .prepare('DELETE FROM presences WHERE volunteer_id = ? AND date = ?')
     .bind(volunteerId, date)
     .run();
+}
+
+// --- Heures effectuées ---
+
+/** Déclare ou met à jour le nombre d'heures effectuées pour un jour donné.
+ *  Réinitialise la validation si les heures changent. */
+export async function setHours(
+  db: D1Database,
+  volunteerId: number,
+  date: string,
+  hours: number,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  // Vérifie qu'une présence existe pour ce jour
+  const presence = await db
+    .prepare('SELECT hours FROM presences WHERE volunteer_id = ? AND date = ?')
+    .bind(volunteerId, date)
+    .first<{ hours: number | null }>();
+
+  if (!presence) return false;
+
+  // Si les heures changent, on réinitialise la validation
+  const needsReset = presence.hours !== hours;
+  if (needsReset) {
+    await db
+      .prepare(
+        `UPDATE presences SET hours = ?, hours_verified = 0, verified_by = NULL, verified_at = NULL, updated_at = ?
+         WHERE volunteer_id = ? AND date = ?`,
+      )
+      .bind(hours, now, volunteerId, date)
+      .run();
+  } else {
+    await db
+      .prepare('UPDATE presences SET hours = ?, updated_at = ? WHERE volunteer_id = ? AND date = ?')
+      .bind(hours, now, volunteerId, date)
+      .run();
+  }
+  return true;
+}
+
+/** Valide ou invalide les heures déclarées par un bénévole (gérant uniquement). */
+export async function verifyHours(
+  db: D1Database,
+  volunteerId: number,
+  date: string,
+  gerantId: number,
+  verified: boolean,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const res = await db
+    .prepare(
+      `UPDATE presences SET hours_verified = ?, verified_by = ?, verified_at = ?
+       WHERE volunteer_id = ? AND date = ? AND hours IS NOT NULL`,
+    )
+    .bind(verified ? 1 : 0, verified ? gerantId : null, verified ? now : null, volunteerId, date)
+    .run();
+  return res.success && (res.meta?.changes ?? 0) > 0;
 }

@@ -11,6 +11,8 @@ import {
   setPresence,
   clearPresence,
   isPresenceStatus,
+  setHours,
+  verifyHours,
   type PresenceStatus,
 } from '../../lib/volunteers';
 import {
@@ -53,6 +55,29 @@ if (Astro.request.method === 'POST') {
   if (action === 'clear') {
     await clearPresence(DB, me.id, dateParam);
     return Astro.redirect(`${back}&ok=efface`, 303);
+  }
+
+  if (action === 'set_hours') {
+    const hoursRaw = String(form.get('hours') ?? '').trim();
+    const hours = Number(hoursRaw);
+    if (!hoursRaw || Number.isNaN(hours) || hours < 0 || hours > 24) {
+      return Astro.redirect(`${back}&err=heures`, 303);
+    }
+    const ok = await setHours(DB, me.id, dateParam, hours);
+    return Astro.redirect(`${back}&${ok ? 'ok=heures' : 'err=pas-present'}`, 303);
+  }
+
+  if (action === 'verify_hours') {
+    if (me.role !== 'gerant') {
+      return new Response('Action non autorisée', { status: 403 });
+    }
+    const targetId = Number(form.get('volunteer_id'));
+    const verified = form.get('verified') === '1';
+    if (!targetId || Number.isNaN(targetId)) {
+      return new Response('Requête invalide', { status: 400 });
+    }
+    const ok = await verifyHours(DB, targetId, dateParam, me.id, verified);
+    return Astro.redirect(`${back}&${ok ? 'ok=valide' : 'err=rien-a-valider'}`, 303);
   }
 
   const status = String(form.get('status') ?? '');
@@ -104,10 +129,18 @@ const toastMessages: Record<string, string> = {
   maybe: 'Réponse enregistrée : peut-être 🤔',
   absent: 'Absence enregistrée. Merci d\'avoir prévenu !',
   efface: 'Votre réponse a été retirée.',
+  heures: 'Heures enregistrées ✅',
+  valide: 'Heures validées ✅',
   event: 'Événement enregistré ✅',
   'event-supprime': 'Événement supprimé du calendrier.',
 };
+const errorMessages: Record<string, string> = {
+  heures: 'Nombre d\'heures invalide (entre 0 et 24).',
+  'pas-present': 'Déclarez votre présence avant de renseigner vos heures.',
+  'rien-a-valider': 'Aucune heure déclarée à valider pour ce bénévole.',
+};
 const toast = ok ? toastMessages[ok] : null;
+const error = errParam ? errorMessages[errParam] : null;
 
 const GROUP_META: { key: PresenceStatus | 'none'; label: string; badge: 'success' | 'warning' | 'danger' | 'neutral' }[] = [
   { key: 'present', label: 'Présents', badge: 'success' },
@@ -134,6 +167,7 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
     />
 
     {toast && <ToastAnimated type="success" message={toast} />}
+    {error && <ToastAnimated type="danger" message={error} />}
 
     <!-- Événements du jour -->
     <section class="space-y-3 animate-slide-up">
@@ -268,6 +302,55 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
           </button>
         </form>
       )}
+
+      <!-- Saisie des heures effectuées -->
+      {myStatus === 'present' && (() => {
+        const myPresence = rows.find(r => r.volunteer_id === me.id);
+        const currentHours = myPresence?.hours ?? null;
+        const isVerified = myPresence?.hours_verified === 1;
+        return (
+          <div class="mt-5 pt-5 border-t border-ink-100">
+            <h3 class="text-sm font-semibold text-ink-900 mb-1 flex items-center gap-2">
+              <Icon name="clock" size={15} class="text-brand-600" />
+              Heures effectuées
+            </h3>
+            <p class="text-xs text-ink-500 mb-3">
+              {isVerified
+                ? 'Vos heures ont été validées par un gérant.'
+                : currentHours !== null
+                  ? `${currentHours}h déclarées — en attente de validation.`
+                  : 'Déclarez le nombre d\'heures effectuées aujourd\'hui.'}
+            </p>
+            <form method="POST" class="flex items-end gap-2">
+              <input type="hidden" name="action" value="set_hours" />
+              <div class="flex-1 max-w-[120px]">
+                <label for="hours" class="block text-xs font-medium text-ink-600 mb-1">Heures</label>
+                <input
+                  id="hours"
+                  name="hours"
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  max="24"
+                  required
+                  defaultValue={currentHours ?? ''}
+                  disabled={isVerified}
+                  class="w-full h-10 px-3 rounded-lg border border-ink-200 bg-white text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:bg-ink-50 disabled:text-ink-400"
+                  placeholder="Ex. 4.5"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isVerified}
+                class="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 active:scale-[0.97] transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <Icon name="check" size={15} />
+                Enregistrer
+              </button>
+            </form>
+          </div>
+        );
+      })()}
     </section>
 
     <!-- L'équipe ce jour -->
@@ -284,13 +367,46 @@ const MY_BTN: { status: PresenceStatus; label: string; icon: 'check' | 'info' | 
             <ul class="divide-y divide-ink-100">
               {groups[g.key].map((v) => {
                 const isMe = v.id === me.id;
+                const presence = rows.find(r => r.volunteer_id === v.id);
+                const hours = presence?.hours ?? null;
+                const isVerified = presence?.hours_verified === 1;
                 return (
                   <li class={`flex items-center gap-3 px-4 sm:px-5 py-2.5 ${isMe ? 'bg-brand-50/60' : ''}`}>
                     <Avatar firstName={v.first_name} lastName={v.last_name} src={v.photo} size="sm" />
-                    <span class="text-sm font-medium text-ink-900">
-                      {v.first_name} {v.last_name}
-                      {isMe && <span class="text-ink-400 font-normal"> (vous)</span>}
-                    </span>
+                    <div class="min-w-0 flex-1">
+                      <span class="text-sm font-medium text-ink-900">
+                        {v.first_name} {v.last_name}
+                        {isMe && <span class="text-ink-400 font-normal"> (vous)</span>}
+                      </span>
+                      {hours !== null && (
+                        <p class="text-xs mt-0.5 flex items-center gap-1.5">
+                          <Icon name="clock" size={12} class={isVerified ? 'text-success-600' : 'text-warning-600'} />
+                          <span class={isVerified ? 'text-success-700 font-medium' : 'text-warning-700'}>
+                            {hours}h
+                          </span>
+                          {isVerified && (
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success-100 text-success-700 ring-1 ring-inset ring-success-200">
+                              Validé
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    {isGerant && !isMe && hours !== null && !isVerified && (
+                      <form method="POST" class="shrink-0">
+                        <input type="hidden" name="action" value="verify_hours" />
+                        <input type="hidden" name="volunteer_id" value={v.id} />
+                        <input type="hidden" name="verified" value="1" />
+                        <button
+                          type="submit"
+                          class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-success-600 hover:text-white hover:bg-success-600 hover:ring-1 hover:ring-success-600 transition-all"
+                          aria-label={`Valider ${hours}h pour ${v.first_name}`}
+                          title="Valider les heures"
+                        >
+                          <Icon name="check" size={16} />
+                        </button>
+                      </form>
+                    )}
                   </li>
                 );
               })}
