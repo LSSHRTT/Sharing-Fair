@@ -144,6 +144,7 @@ const errorMessages: Record<string, string> = {
   'pas-present': 'Déclarez votre présence avant de renseigner vos heures.',
   'rien-a-valider': 'Aucune heure déclarée à valider pour ce bénévole.',
 };
+const errParam = Astro.url.searchParams.get('err');
 const toast = ok ? toastMessages[ok] : null;
 const error = errParam ? errorMessages[errParam] : null;
 
