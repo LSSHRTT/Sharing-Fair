@@ -5,9 +5,11 @@ import Avatar from '../components/ui/Avatar.astro';
 import Icon from '../components/ui/Icon.astro';
 import ToastAnimated from '../components/ui/ToastAnimated.astro';
 import { listMessages, sendMessage } from '../lib/chat';
+import { sendPushTickle } from '../lib/push';
 
 const DB = Astro.locals.runtime.env.DB;
 const me = Astro.locals.volunteer!;
+const runtime = Astro.locals.runtime as { env: Record<string, string>; ctx: { waitUntil(p: Promise<unknown>): void } };
 
 // ============================================================
 // Envoi d'un message
@@ -47,6 +49,12 @@ if (Astro.request.method === 'POST') {
   } else if (!errorKey) {
     const msg = await sendMessage(DB, me.id, content || null, imageDataUrl);
     if (msg) {
+      // Notification push vers les autres bénévoles (en tâche de fond)
+      if (runtime?.ctx) {
+        runtime.ctx.waitUntil(
+          sendPushTickle(DB, runtime.env, me.id).catch(() => {}),
+        );
+      }
       return Astro.redirect('/chat?ok=envoye', 303);
     }
     errorKey = 'vide';
