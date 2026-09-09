@@ -36,6 +36,19 @@ export async function listMessages(
   return res.results.reverse();
 }
 
+/** Supprime un message du chat. Seul l'auteur peut supprimer son propre message. */
+export async function deleteMessage(
+  db: D1Database,
+  messageId: number,
+  volunteerId: number,
+): Promise<boolean> {
+  const res = await db
+    .prepare('DELETE FROM messages WHERE id = ? AND sender_id = ?')
+    .bind(messageId, volunteerId)
+    .run();
+  return res.success && (res.meta?.changes ?? 0) > 0;
+}
+
 /** Envoie un message dans le chat (texte et/ou image). Retourne le message créé avec les infos auteur. */
 export async function sendMessage(
   db: D1Database,

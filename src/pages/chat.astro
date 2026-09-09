@@ -4,7 +4,7 @@ import PageHeader from '../components/ui/PageHeader.astro';
 import Avatar from '../components/ui/Avatar.astro';
 import Icon from '../components/ui/Icon.astro';
 import ToastAnimated from '../components/ui/ToastAnimated.astro';
-import { listMessages, sendMessage } from '../lib/chat';
+import { listMessages, sendMessage, deleteMessage } from '../lib/chat';
 import { sendPushTickle } from '../lib/push';
 
 const DB = Astro.locals.runtime.env.DB;
@@ -59,6 +59,19 @@ if (Astro.request.method === 'POST') {
     }
     errorKey = 'vide';
   }
+
+  // Suppression d'un message (long press → confirmation → POST delete)
+  if (Astro.request.method === 'POST') {
+    const form2 = await Astro.request.formData();
+    const action = String(form2.get('action') ?? '');
+    if (action === 'delete_message') {
+      const msgId = Number(form2.get('message_id'));
+      if (msgId && !Number.isNaN(msgId)) {
+        const deleted = await deleteMessage(DB, msgId, me.id);
+        return Astro.redirect(`/chat?${deleted ? 'ok=supprime' : 'err=non-autorise'}`, 303);
+      }
+    }
+  }
 }
 
 // ============================================================
@@ -73,9 +86,10 @@ const errorMessages: Record<string, string> = {
   vide: 'Le message ne peut pas être vide.',
   trop_long: 'Le message est trop long (2000 caractères max).',
   image_trop_lourde: 'L\'image est trop lourde (2 Mo max).',
+  'non-autorise': 'Vous ne pouvez supprimer que vos propres messages.',
 };
 const error = errorMessages[errorKey ?? errParam ?? ''] ?? null;
-const toast = ok === 'envoye' ? 'Message envoyé ✅' : null;
+const toast = ok === 'envoye' ? 'Message envoyé ✅' : ok === 'supprime' ? 'Message supprimé 🗑️' : null;
 
 // Formatage heure relative
 function formatTime(iso: string): string {
@@ -117,14 +131,16 @@ function formatTime(iso: string): string {
                   </span>
                 )}
                 <div
-                  class={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
+                  class={`chat-bubble px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words select-none ${
                     isMe
                       ? 'bg-brand-600 text-white rounded-tr-md'
                       : 'bg-ink-100 text-ink-900 rounded-tl-md'
                   }`}
+                  data-msg-id={msg.id}
+                  data-is-me={isMe ? '1' : '0'}
                 >
                   {msg.image && (
-                    <img src={msg.image} alt="" class="max-w-full max-h-[300px] rounded-lg mb-2 block" loading="lazy" />
+                    <img src={msg.image} alt="" class="max-w-full max-h-[300px] rounded-lg mb-2 block pointer-events-none" loading="lazy" />
                   )}
                   {msg.content}
                 </div>
@@ -209,5 +225,52 @@ function formatTime(iso: string): string {
         clearImage();
       });
     }
+
+    // Long press pour supprimer son propre message
+    let longPressTimer = null;
+    const LONG_PRESS_MS = 600;
+
+    document.querySelectorAll('.chat-bubble[data-is-me="1"]').forEach((bubble) => {
+      const msgId = bubble.getAttribute('data-msg-id');
+
+      const startLongPress = (e) => {
+        // Ignorer si c'est un lien ou une image cliquable
+        if (e.target.closest('a')) return;
+        longPressTimer = setTimeout(() => {
+          longPressTimer = null;
+          if (confirm('Supprimer ce message ?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.style.display = 'none';
+            const actionInput = document.createElement('input');
+            actionInput.name = 'action';
+            actionInput.value = 'delete_message';
+            const idInput = document.createElement('input');
+            idInput.name = 'message_id';
+            idInput.value = msgId;
+            form.appendChild(actionInput);
+            form.appendChild(idInput);
+            document.body.appendChild(form);
+            form.submit();
+          }
+        }, LONG_PRESS_MS);
+      };
+
+      const cancelLongPress = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      };
+
+      bubble.addEventListener('touchstart', startLongPress, { passive: true });
+      bubble.addEventListener('touchend', cancelLongPress);
+      bubble.addEventListener('touchmove', cancelLongPress);
+      bubble.addEventListener('mousedown', startLongPress);
+      bubble.addEventListener('mouseup', cancelLongPress);
+      bubble.addEventListener('mouseleave', cancelLongPress);
+      // Empêcher le menu contextuel natif sur mobile
+      bubble.addEventListener('contextmenu', (e) => e.preventDefault());
+    });
   </script>
 </Layout>
