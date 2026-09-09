@@ -14,6 +14,16 @@ const me = Astro.locals.volunteer!;
 // ============================================================
 let errorKey: 'vide' | 'trop_long' | 'image_trop_lourde' | null = null;
 
+// Conversion ArrayBuffer → base64 compatible Cloudflare Workers (pas de Buffer)
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const content = String(form.get('content') ?? '').trim();
@@ -21,11 +31,11 @@ if (Astro.request.method === 'POST') {
 
   let imageDataUrl: string | null = null;
   if (imageFile && imageFile.size > 0) {
-    if (imageFile.size > 5 * 1024 * 1024) {
+    if (imageFile.size > 2 * 1024 * 1024) {
       errorKey = 'image_trop_lourde';
     } else {
       const buffer = await imageFile.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
+      const base64 = arrayBufferToBase64(buffer);
       imageDataUrl = `data:${imageFile.type};base64,${base64}`;
     }
   }
@@ -54,7 +64,7 @@ const errParam = Astro.url.searchParams.get('err');
 const errorMessages: Record<string, string> = {
   vide: 'Le message ne peut pas être vide.',
   trop_long: 'Le message est trop long (2000 caractères max).',
-  image_trop_lourde: 'L\'image est trop lourde (5 Mo max).',
+  image_trop_lourde: 'L\'image est trop lourde (2 Mo max).',
 };
 const error = errorMessages[errorKey ?? errParam ?? ''] ?? null;
 const toast = ok === 'envoye' ? 'Message envoyé ✅' : null;
