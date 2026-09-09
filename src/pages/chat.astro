@@ -1,0 +1,137 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PageHeader from '../components/ui/PageHeader.astro';
+import Avatar from '../components/ui/Avatar.astro';
+import Icon from '../components/ui/Icon.astro';
+import ToastAnimated from '../components/ui/ToastAnimated.astro';
+import { listMessages, sendMessage } from '../lib/chat';
+
+const DB = Astro.locals.runtime.env.DB;
+const me = Astro.locals.volunteer!;
+
+// ============================================================
+// Envoi d'un message
+// ============================================================
+let errorKey: 'vide' | 'trop_long' | null = null;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const content = String(form.get('content') ?? '').trim();
+
+  if (!content) {
+    errorKey = 'vide';
+  } else if (content.length > 2000) {
+    errorKey = 'trop_long';
+  } else {
+    const msg = await sendMessage(DB, me.id, content);
+    if (msg) {
+      return Astro.redirect('/chat?ok=envoye', 303);
+    }
+    errorKey = 'vide';
+  }
+}
+
+// ============================================================
+// Chargement des messages
+// ============================================================
+const messages = await listMessages(DB, 100);
+
+// --- Retours d'action ---
+const ok = Astro.url.searchParams.get('ok');
+const errParam = Astro.url.searchParams.get('err');
+const errorMessages: Record<string, string> = {
+  vide: 'Le message ne peut pas être vide.',
+  trop_long: 'Le message est trop long (2000 caractères max).',
+};
+const error = errorMessages[errorKey ?? errParam ?? ''] ?? null;
+const toast = ok === 'envoye' ? 'Message envoyé ✅' : null;
+
+// Formatage heure relative
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return new Intl.DateTimeFormat('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Paris',
+  }).format(d);
+}
+---
+
+<Layout title="Chat — Sharing Fair">
+  <div class="max-w-3xl mx-auto space-y-4 h-[calc(100vh-8rem)] md:h-[calc(100vh-6rem)] flex flex-col">
+    <PageHeader
+      title="Chat d'équipe"
+      description="Discutez avec les autres bénévoles de l'équipe."
+    />
+
+    {toast && <ToastAnimated type="success" message={toast} />}
+    {error && <ToastAnimated type="danger" message={error} />}
+
+    <!-- Zone des messages -->
+    <section class="surface flex-1 overflow-y-auto p-4 space-y-4 animate-slide-up scroll-smooth" id="chat-messages">
+      {messages.length === 0 ? (
+        <p class="text-sm text-ink-400 text-center py-8">
+          Aucun message pour le moment. Soyez le premier à écrire !
+        </p>
+      ) : (
+        messages.map((msg) => {
+          const isMe = msg.sender_id === me.id;
+          return (
+            <div class={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+              <Avatar firstName={msg.first_name} lastName={msg.last_name} src={msg.photo} size="sm" class="shrink-0 mt-1" />
+              <div class={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                {!isMe && (
+                  <span class="text-[11px] font-medium text-ink-500 mb-0.5 ml-1">
+                    {msg.first_name} {msg.last_name}
+                  </span>
+                )}
+                <div
+                  class={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
+                    isMe
+                      ? 'bg-brand-600 text-white rounded-tr-md'
+                      : 'bg-ink-100 text-ink-900 rounded-tl-md'
+                  }`}
+                >
+                  {msg.content}
+                </div>
+                <span class={`text-[10px] text-ink-400 mt-0.5 ${isMe ? 'mr-1' : 'ml-1'}`}>
+                  {formatTime(msg.created_at)}
+                </span>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </section>
+
+    <!-- Formulaire d'envoi -->
+    <form method="POST" class="surface p-3 sm:p-4 animate-slide-up shrink-0" style="animation-delay: 0.08s">
+      <div class="flex items-end gap-2">
+        <div class="flex-1">
+          <textarea
+            name="content"
+            required
+            maxlength="2000"
+            rows="1"
+            placeholder="Écrivez un message…"
+            class="w-full px-4 py-2.5 rounded-xl border border-ink-200 bg-white text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none min-h-[44px] max-h-[120px]"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+          />
+        </div>
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-brand-600 text-white hover:bg-brand-700 active:scale-[0.95] transition-all shrink-0"
+          aria-label="Envoyer"
+        >
+          <Icon name="send" size={18} />
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script is:inline>
+    // Auto-scroll vers le bas au chargement
+    const chatEl = document.getElementById('chat-messages');
+    if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+  </script>
+</Layout>
