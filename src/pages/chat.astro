@@ -28,6 +28,19 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
+  const action = String(form.get('action') ?? '');
+
+  // Suppression d'un message (long press → confirmation → POST delete)
+  if (action === 'delete_message') {
+    const msgId = Number(form.get('message_id'));
+    if (msgId && !Number.isNaN(msgId)) {
+      const deleted = await deleteMessage(DB, msgId, me.id);
+      return Astro.redirect(`/chat?${deleted ? 'ok=supprime' : 'err=non-autorise'}`, 303);
+    }
+    return Astro.redirect('/chat?err=non-autorise', 303);
+  }
+
+  // Envoi d'un message
   const content = String(form.get('content') ?? '').trim();
   const imageFile = form.get('image') as File | null;
 
@@ -58,19 +71,6 @@ if (Astro.request.method === 'POST') {
       return Astro.redirect('/chat?ok=envoye', 303);
     }
     errorKey = 'vide';
-  }
-
-  // Suppression d'un message (long press → confirmation → POST delete)
-  if (Astro.request.method === 'POST') {
-    const form2 = await Astro.request.formData();
-    const action = String(form2.get('action') ?? '');
-    if (action === 'delete_message') {
-      const msgId = Number(form2.get('message_id'));
-      if (msgId && !Number.isNaN(msgId)) {
-        const deleted = await deleteMessage(DB, msgId, me.id);
-        return Astro.redirect(`/chat?${deleted ? 'ok=supprime' : 'err=non-autorise'}`, 303);
-      }
-    }
   }
 }
 
