@@ -6,7 +6,8 @@
 CREATE TABLE IF NOT EXISTS messages (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   sender_id   INTEGER NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
-  content     TEXT NOT NULL,
+  content     TEXT,
+  image       TEXT,
   created_at  TEXT NOT NULL
 );
 

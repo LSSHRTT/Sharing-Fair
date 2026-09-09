@@ -8,14 +8,15 @@
 export interface ChatMessage {
   id: number;
   sender_id: number;
-  content: string;
+  content: string | null;
+  image: string | null;
   created_at: string;
   first_name: string;
   last_name: string;
   photo: string | null;
 }
 
-const MESSAGE_COLUMNS = `m.id, m.sender_id, m.content, m.created_at, v.first_name, v.last_name, v.photo`;
+const MESSAGE_COLUMNS = `m.id, m.sender_id, m.content, m.image, m.created_at, v.first_name, v.last_name, v.photo`;
 
 /** Récupère les N derniers messages du chat (plus récents en dernier). */
 export async function listMessages(
@@ -35,23 +36,25 @@ export async function listMessages(
   return res.results.reverse();
 }
 
-/** Envoie un message dans le chat. Retourne le message créé avec les infos auteur. */
+/** Envoie un message dans le chat (texte et/ou image). Retourne le message créé avec les infos auteur. */
 export async function sendMessage(
   db: D1Database,
   senderId: number,
-  content: string,
+  content: string | null,
+  image: string | null,
 ): Promise<ChatMessage | null> {
   const now = new Date().toISOString();
-  const trimmed = content.trim();
-  if (!trimmed || trimmed.length > 2000) return null;
+  const trimmedContent = content?.trim() || null;
+  if (!trimmedContent && !image) return null;
+  if (trimmedContent && trimmedContent.length > 2000) return null;
 
   const inserted = await db
     .prepare(
-      `INSERT INTO messages (sender_id, content, created_at) VALUES (?, ?, ?)
-       RETURNING id, sender_id, content, created_at`,
+      `INSERT INTO messages (sender_id, content, image, created_at) VALUES (?, ?, ?, ?)
+       RETURNING id, sender_id, content, image, created_at`,
     )
-    .bind(senderId, trimmed, now)
-    .first<{ id: number; sender_id: number; content: string; created_at: string }>();
+    .bind(senderId, trimmedContent, image, now)
+    .first<{ id: number; sender_id: number; content: string | null; image: string | null; created_at: string }>();
 
   if (!inserted) return null;
 
@@ -67,6 +70,7 @@ export async function sendMessage(
     id: inserted.id,
     sender_id: inserted.sender_id,
     content: inserted.content,
+    image: inserted.image,
     created_at: inserted.created_at,
     first_name: author.first_name,
     last_name: author.last_name,
