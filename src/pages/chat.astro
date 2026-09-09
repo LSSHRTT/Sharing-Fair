@@ -133,7 +133,7 @@ function formatTime(iso: string): string {
     <!-- Formulaire d'envoi -->
     <form method="POST" enctype="multipart/form-data" class="surface p-3 sm:p-4 animate-slide-up shrink-0" style="animation-delay: 0.08s">
       <!-- Prévisualisation image au-dessus du champ texte -->
-      <div id="chat-img-preview-bar" class="hidden mb-2 relative inline-block">
+      <div id="chat-img-preview-bar" class="hidden mb-2 relative inline-block" style="display:none">
         <img id="chat-img-preview" class="max-h-[120px] rounded-lg border border-ink-200 block" alt="" />
         <button type="button" id="chat-img-remove" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-ink-900 text-white flex items-center justify-center text-xs hover:bg-danger-600 transition-colors" aria-label="Retirer l'image">
           <Icon name="x" size={12} />
