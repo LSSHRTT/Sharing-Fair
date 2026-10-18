@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 const isVercel = !!process.env.VERCEL;
 
 export default defineConfig({
+  security: { checkOrigin: false },
   output: 'server',
   adapter: isVercel
     ? vercel()
