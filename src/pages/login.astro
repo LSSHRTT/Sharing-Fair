@@ -25,12 +25,19 @@ if (Astro.request.method === 'POST') {
   const target = submittedNext.startsWith('/') && !submittedNext.startsWith('//') ? submittedNext : '/';
 
   let volunteer = null;
-  if (firstName.trim() && lastName.trim() && password) {
-    volunteer = await findVolunteerForLogin(env.DB, firstName, lastName);
+  try {
+    if (firstName.trim() && lastName.trim() && password) {
+      volunteer = await findVolunteerForLogin(env.DB, firstName, lastName);
+    }
+  } catch (e: unknown) {
+    console.error('[login] findVolunteer', e);
+    error = `Erreur technique : ${String((e as any)?.message ?? e).slice(0,120)}`;
   }
 
-  if (volunteer && verifyCredential(volunteer, password)) {
-    const token = await createSessionToken(env.AUTH_SECRET, volunteer.id);
+  if (!error && volunteer && verifyCredential(volunteer, password)) {
+    let token: string;
+    try { token = await createSessionToken(env.AUTH_SECRET || 'fallback-' + Date.now(), volunteer.id); } catch (e: unknown) { console.error('[login] token', e); error = `Erreur session : ${String((e as any)?.message ?? e).slice(0,120)}`; token = '' as string; }
+    if (!error) {
     const cookieOptions = {
       path: '/',
       httpOnly: true,
@@ -40,8 +47,9 @@ if (Astro.request.method === 'POST') {
     };
     Astro.cookies.set(sessionCookieName(), token, cookieOptions);
     return Astro.redirect(target, 302);
+    } // end inner try
   }
-  error = 'Identifiants incorrects. Vérifiez votre prénom, votre nom et votre mot de passe.';
+  if (!error) error = 'Identifiants incorrects. Vérifiez votre prénom, votre nom et votre mot de passe.';
 }
 ---
 
