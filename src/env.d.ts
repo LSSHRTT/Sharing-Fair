@@ -1,6 +1,8 @@
 /// <reference types="astro/client" />
+/// <reference types="@libsql/client" />
 
-type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
+type CloudflareRuntime = import('@astrojs/cloudflare').Runtime<Env>;
+type VercelRuntime = import('@astrojs/vercel').Runtime<Env>;
 
 interface Env {
   DB: D1Database;
@@ -11,7 +13,7 @@ interface Env {
 }
 
 declare namespace App {
-  interface Locals extends Runtime {
+  interface Locals extends Omit<CloudflareRuntime, 'runtime'>, VercelRuntime {
     /** Bénévole connecté — renseigné par le middleware après vérification. */
     volunteer?: import('./lib/volunteers').VolunteerIdentity;
   }

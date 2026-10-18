@@ -25,11 +25,18 @@ function isPublic(pathname: string): boolean {
 export const onRequest = defineMiddleware(async (context, next) => {
   const { url, cookies, redirect, locals } = context;
 
+  // Vercel: injecte Turso même pour les routes publiques (isPublic bypassait avant)
+  let env = (locals as any).runtime?.env as Env | undefined;
+  if (!env?.DB && (globalThis as any).process?.env?.TURSO_DATABASE_URL) {
+    const { getTursoAsD1 } = await import('./lib/turso.js');
+    const { TURSO_DATABASE_URL, ...rest } = (globalThis as any).process.env;
+    env = { DB: getTursoAsD1(), AUTH_SECRET: rest.AUTH_SECRET ?? '', VAPID_PUBLIC_KEY: rest.VAPID_PUBLIC_KEY, VAPID_PRIVATE_JWK: rest.VAPID_PRIVATE_JWK, VAPID_SUBJECT: rest.VAPID_SUBJECT } as unknown as Env;
+    (locals as any).runtime = { env } as any;
+  }
+
   if (isPublic(url.pathname)) {
     return next();
   }
-
-  const env = (locals as any).runtime?.env as Env | undefined;
   const secret = env?.AUTH_SECRET ?? '';
   const db = env?.DB;
   const token = cookies.get(sessionCookieName())?.value;
